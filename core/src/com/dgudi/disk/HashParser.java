@@ -1,5 +1,7 @@
 package com.dgudi.disk;
 
+import com.badlogic.gdx.scenes.scene2d.Touchable;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -8,6 +10,7 @@ import java.util.HashMap;
 
 import static com.dgudi.disk.FileUtils.loadObject;
 import static com.dgudi.disk.FileUtils.saveObject;
+import static com.dgudi.disk.Main.changeUiTouchableState;
 
 public class HashParser {
 
@@ -59,6 +62,7 @@ public class HashParser {
     @SuppressWarnings("unchecked")
     static void readHashBase() {
         Main.currentFile = "Reading hash database";
+        changeUiTouchableState(Touchable.disabled);
         new Thread(new Runnable() {
             public void run() {
 
@@ -80,6 +84,7 @@ public class HashParser {
                 Main.currentFile = "";
                 Main.currentHash = "";
                 Main.currentErrorMessage = "[#00DDFF]Info: " + hashBase_fileSizes.size() + " " + hashBase_fileHashes.size();
+                changeUiTouchableState(Touchable.enabled);
             }
         }).start();
     }

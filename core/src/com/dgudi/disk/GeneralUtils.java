@@ -65,8 +65,6 @@ public class GeneralUtils {
     static boolean hasBeenRenamed(File file){
         String creationDate = getImageCreationDate(file);
         String cameraModel = getImageCameraModel(file);
-        return file.getName().startsWith(creationDate) && file.getName().contains(cameraModel);
+        return (file.getName().startsWith(creationDate) && file.getName().contains(cameraModel)) || file.getName().replaceAll("[^0-9]", "").length() >= 15;
     }
-
-
 }

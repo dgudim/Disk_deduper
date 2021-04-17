@@ -110,16 +110,16 @@ public class Main extends ApplicationAdapter {
     Stage stage_results;
     ShapeRenderer renderer;
 
-    TextButton startScan;
-    TextButton changeMode;
+    static TextButton startScan;
+    static TextButton changeMode;
     TextButton commit;
-    TextButton addFolder;
-    TextButton removeAllFolders;
-    TextButton setMasterPath;
-    TextButton addSlavePath;
-    TextButton setClonePath;
-    TextButton removeAllExtensions;
-    TextButton addExtension;
+    static TextButton addFolder;
+    static TextButton removeAllFolders;
+    static TextButton setMasterPath;
+    static TextButton addSlavePath;
+    static TextButton setClonePath;
+    static TextButton removeAllExtensions;
+    static TextButton addExtension;
 
     public static String currentFile = "";
     public static String currentHash = "";
@@ -193,7 +193,7 @@ public class Main extends ApplicationAdapter {
     @SuppressWarnings("unchecked")
     public void create() {
 
-       MemoryUtils.setDisplayFactor(400);
+        MemoryUtils.setDisplayFactor(400);
 
         filesPerSecSmoothing = new float[filesPerSecSmoothingFrame * 60];
 
@@ -505,7 +505,7 @@ public class Main extends ApplicationAdapter {
         Gdx.input.setInputProcessor(stage);
     }
 
-    void changeUiTouchableState(Touchable touchable) {
+    static void changeUiTouchableState(Touchable touchable) {
         if (touchable.equals(Touchable.disabled)) {
             startScan.setColor(Color.GRAY);
             changeMode.setColor(Color.GRAY);
@@ -1009,22 +1009,27 @@ public class Main extends ApplicationAdapter {
                                 String newFileName = getFilePathWithoutName(files.get(i).getAbsolutePath()) + "\\" + getImageCreationDateAndCameraModel(files.get(i));
                                 currentFile = files.get(i).toString();
                                 currentHash = newFileName;
-                                boolean success;
+                                boolean success = false;
+                                boolean skipped = false;
                                 if (hasBeenRenamed(files.get(i))) {
                                     currentErrorMessage = "[#00DDFF]Info: skipped " + currentFile;
-                                    success = true;
+                                    skipped = true;
                                 } else {
                                     success = files.get(i).renameTo(new File(newFileName));
                                     sleep();
                                 }
                                 comparedFiles++;
-                                String message = files.get(i) + " to " + newFileName + "\n";
-                                String additionalMessage = "renamed ";
-                                if (!success) {
-                                    additionalMessage = "Error renaming ";
-                                    currentErrorMessage = "[#FF0000]Error renaming " + files.get(i) + " to " + newFileName;
+                                if (skipped) {
+                                    dupes_merged.add("(" + files.get(i).getName() + ")Skipped: " + files.get(i) + "\n");
+                                } else {
+                                    String message = files.get(i).getName() + " to " + new File(newFileName).getName() + "\n";
+                                    String additionalMessage = "renamed ";
+                                    if (!success) {
+                                        additionalMessage = "Error renaming ";
+                                        currentErrorMessage = "[#FF0000]Error renaming " + files.get(i) + " to " + newFileName;
+                                    }
+                                    dupes_merged.add(getFilePathWithoutName(files.get(i).getAbsolutePath()) + " : " + additionalMessage + message);
                                 }
-                                dupes_merged.add(additionalMessage + message);
                             }
                             allFiles++;
                         }
