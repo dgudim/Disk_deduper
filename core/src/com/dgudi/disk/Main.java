@@ -48,6 +48,7 @@ import de.tomgrill.gdxdialogs.core.listener.ButtonClickListener;
 
 import static com.dgudi.disk.EXIFUtils.getImageCameraModel;
 import static com.dgudi.disk.EXIFUtils.getImageCreationDateAndCameraModel;
+import static com.dgudi.disk.FileUtils.emptyDirectorySize;
 import static com.dgudi.disk.FileUtils.getAllDirectories;
 import static com.dgudi.disk.FileUtils.getAllFiles;
 import static com.dgudi.disk.FileUtils.getFilePathWithoutName;
@@ -64,17 +65,34 @@ import static com.dgudi.disk.GeneralUtils.formatNumber;
 import static com.dgudi.disk.GeneralUtils.getCurrentDate;
 import static com.dgudi.disk.GeneralUtils.getCurrentTime;
 import static com.dgudi.disk.GeneralUtils.getElapsedTime;
+import static com.dgudi.disk.GeneralUtils.hasBeenRenamed;
 import static com.dgudi.disk.GeneralUtils.normaliseLength;
 import static com.dgudi.disk.HashParser.currentCommits;
 import static com.dgudi.disk.HashParser.getFileChecksum;
 import static com.dgudi.disk.HashParser.readHashBase;
 import static com.dgudi.disk.HashParser.saveHashBase;
+import static com.dgudi.disk.MemoryUtils.getAvailableMemoryInGb;
+import static com.dgudi.disk.MemoryUtils.getCachedMemInPixels;
+import static com.dgudi.disk.MemoryUtils.getMaxMemoryUsageInGb;
+import static com.dgudi.disk.MemoryUtils.getMaxMemoryUsageInPixels;
+import static com.dgudi.disk.MemoryUtils.getUsedMemInGb;
+import static com.dgudi.disk.MemoryUtils.getUsedMemInPixels;
+import static com.dgudi.disk.Mode.COMPARE_2_FOLDERS_MOVE;
+import static com.dgudi.disk.Mode.COMPARE_2_FOLDERS_RENAME;
+import static com.dgudi.disk.Mode.EXIF_SORT;
+import static com.dgudi.disk.Mode.HASH_COMPARE;
+import static com.dgudi.disk.Mode.NAME_COMPARE;
+import static com.dgudi.disk.Mode.SHOW_STATS;
 import static com.dgudi.disk.TextureUtils.constructFilledImageWithColor;
 import static com.dgudi.disk.TextureUtils.createThumbnail;
 import static com.dgudi.disk.TextureUtils.excludedFormats;
 import static com.dgudi.disk.TextureUtils.loadPreview;
 import static com.dgudi.disk.TextureUtils.unloadAllTextures;
 import static java.lang.Math.min;
+
+enum Mode {
+    NAME_COMPARE, HASH_COMPARE, COMPARE_2_FOLDERS_MOVE, COMPARE_2_FOLDERS_RENAME, EXIF_SORT, SHOW_STATS;
+}
 
 public class Main extends ApplicationAdapter {
 
@@ -110,7 +128,7 @@ public class Main extends ApplicationAdapter {
     final HashMap<String, String> hashedFiles = new HashMap<>();
     int allFiles = 0;
     int prevFiles = 0;
-    final int filesPerSecSmoothingFrame = 15; //Min
+    final int filesPerSecSmoothingFrame = 15;
     float[] filesPerSecSmoothing;
     int comparedFiles = 0;
     int duplicatesOriginal = 0;
@@ -122,16 +140,8 @@ public class Main extends ApplicationAdapter {
     long startTime;
     boolean extensionFilterEnabled = true;
 
-    final String NAME_SEARCH = "searchNames";
-    final String SEARCH = "search";
-    final String COMPARE_2_FOLDERS = "comp2f";
-    final String COMPARE_2_FOLDERS_RENAME = "comp2fR";
-    final String EXIF_SORT = "exifSort";
-    final String STATS = "stats";
+    Mode mode = NAME_COMPARE;
 
-    int emptyDirectorySize = 5000;
-
-    String comparisonMode = SEARCH;
     String comparisonMode_humanReadable;
 
     String masterPath, clonePath;
@@ -171,25 +181,21 @@ public class Main extends ApplicationAdapter {
     ArrayList<String> notSortedFilesArray_leftPart = new ArrayList<>();
     ArrayList<String> notSortedFilesArray_rightPart = new ArrayList<>();
 
-    final static String deletedMessage = "_DELETED_";
-
     final String fontChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890\"!`?'.,;:()[]{}<>|/@\\^$€-%+=#_&~*ёйцукенгшщзхъэждлорпавыфячсмитьбюЁЙЦУКЕНГШЩЗХЪЭЖДЛОРПАВЫФЯЧСМИТЬБЮ";
-    long maxMemUsage = 0;
-    long availableMem = 0;
-    double memDisplayFactor = 0;
 
     JsonValue modeNamesMap;
 
     GDXDialogs dialogs;
 
+    MemoryUtils memoryUtils;
+
     @Override
     @SuppressWarnings("unchecked")
     public void create() {
 
-        filesPerSecSmoothing = new float[filesPerSecSmoothingFrame * 60];
+       MemoryUtils.setDisplayFactor(400);
 
-        availableMem = Runtime.getRuntime().maxMemory();
-        memDisplayFactor = 400 / (double) availableMem;
+        filesPerSecSmoothing = new float[filesPerSecSmoothingFrame * 60];
 
         readHashBase();
 
@@ -321,24 +327,24 @@ public class Main extends ApplicationAdapter {
         changeMode.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                switch (comparisonMode) {
-                    case SEARCH:
-                        comparisonMode = NAME_SEARCH;
+                switch (mode) {
+                    case HASH_COMPARE:
+                        mode = NAME_COMPARE;
                         break;
-                    case NAME_SEARCH:
-                        comparisonMode = COMPARE_2_FOLDERS;
+                    case NAME_COMPARE:
+                        mode = COMPARE_2_FOLDERS_MOVE;
                         break;
-                    case COMPARE_2_FOLDERS:
-                        comparisonMode = COMPARE_2_FOLDERS_RENAME;
+                    case COMPARE_2_FOLDERS_MOVE:
+                        mode = COMPARE_2_FOLDERS_RENAME;
                         break;
                     case COMPARE_2_FOLDERS_RENAME:
-                        comparisonMode = EXIF_SORT;
+                        mode = EXIF_SORT;
                         break;
                     case EXIF_SORT:
-                        comparisonMode = STATS;
+                        mode = SHOW_STATS;
                         break;
-                    case STATS:
-                        comparisonMode = SEARCH;
+                    case SHOW_STATS:
+                        mode = HASH_COMPARE;
                         break;
                 }
                 updateModeDescription();
@@ -607,7 +613,7 @@ public class Main extends ApplicationAdapter {
     }
 
     void updateModeDescription() {
-        comparisonMode_humanReadable = modeNamesMap.getString(comparisonMode);
+        comparisonMode_humanReadable = modeNamesMap.getString(mode.toString());
     }
 
     void deleteFilesFromGroup(ArrayList<ArrayList<String>> group, boolean safeDelete) {
@@ -701,8 +707,8 @@ public class Main extends ApplicationAdapter {
     }
 
     void commitChanges() {
-        String fileName = saveDirectory + "results_" + comparisonMode + getCurrentDate() + "\\commit" + getCurrentTime() + "." + commitCount + ".txt";
-        if (comparisonMode.equals(SEARCH)) {
+        String fileName = saveDirectory + "results_" + mode + getCurrentDate() + "\\commit" + getCurrentTime() + "." + commitCount + ".txt";
+        if (mode.equals(HASH_COMPARE) || mode.equals(NAME_COMPARE)) {
             dupes_merged.clear();
             for (int i = 0; i < dupes_first_part.size(); i++) {
                 dupes_merged.add("\n\n\n" + dupes_first_part.get(i) + "\n and \n" + dupes_second_part.get(i));
@@ -728,7 +734,7 @@ public class Main extends ApplicationAdapter {
 
         for (String param : allParams) {
             if (param.startsWith("c_mode_")) {
-                comparisonMode = param.substring(7);
+                mode = Mode.valueOf(param.substring(7));
             }
             if (param.startsWith("foldMaster_")) {
                 masterPath = param.substring(11);
@@ -753,7 +759,7 @@ public class Main extends ApplicationAdapter {
 
     void saveParams() {
         StringBuilder paramsToWrite = new StringBuilder();
-        paramsToWrite.append("c_mode_").append(comparisonMode).append("\r\n");
+        paramsToWrite.append("c_mode_").append(mode).append("\r\n");
         for (String folderPath : foldersToSearch) {
             paramsToWrite.append("fold_").append(folderPath).append("\r\n");
         }
@@ -816,8 +822,8 @@ public class Main extends ApplicationAdapter {
         new Thread(new Runnable() {
             public void run() {
                 startTime = System.currentTimeMillis();
-                switch (comparisonMode) {
-                    case COMPARE_2_FOLDERS:
+                switch (mode) {
+                    case COMPARE_2_FOLDERS_MOVE:
                     case COMPARE_2_FOLDERS_RENAME:
                         ArrayList<File> files_master = getAllFiles(masterPath);
                         allFilesCalculated = files_master.size();
@@ -840,7 +846,7 @@ public class Main extends ApplicationAdapter {
                                     if (hashedFiles.containsKey(hash)) {
                                         String fullPath;
                                         long originalFileSize = slave_file.length();
-                                        if (comparisonMode.equals(COMPARE_2_FOLDERS)) {
+                                        if (mode.equals(COMPARE_2_FOLDERS_MOVE)) {
                                             fullPath = moveAccordingToFolderStructure(slave_file, clonePath);
                                         } else {
                                             fullPath = markAsDeleted(slave_file);
@@ -854,8 +860,8 @@ public class Main extends ApplicationAdapter {
                             }
                         }
                         break;
-                    case SEARCH:
-                    case NAME_SEARCH:
+                    case HASH_COMPARE:
+                    case NAME_COMPARE:
                         new Thread(new Runnable() {
                             public void run() {
                                 int filesCalculated = 0;
@@ -1003,8 +1009,14 @@ public class Main extends ApplicationAdapter {
                                 String newFileName = getFilePathWithoutName(files.get(i).getAbsolutePath()) + "\\" + getImageCreationDateAndCameraModel(files.get(i));
                                 currentFile = files.get(i).toString();
                                 currentHash = newFileName;
-                                boolean success = files.get(i).renameTo(new File(newFileName));
-                                sleep();
+                                boolean success;
+                                if (hasBeenRenamed(files.get(i))) {
+                                    currentErrorMessage = "[#00DDFF]Info: skipped " + currentFile;
+                                    success = true;
+                                } else {
+                                    success = files.get(i).renameTo(new File(newFileName));
+                                    sleep();
+                                }
                                 comparedFiles++;
                                 String message = files.get(i) + " to " + newFileName + "\n";
                                 String additionalMessage = "renamed ";
@@ -1018,7 +1030,7 @@ public class Main extends ApplicationAdapter {
                         }
                         break;
                     }
-                    case STATS: {
+                    case SHOW_STATS: {
 
                         ArrayList<String> extensions_sorted_size = new ArrayList<>();
                         ArrayList<String> extensions_sorted_quantity = new ArrayList<>();
@@ -1249,7 +1261,7 @@ public class Main extends ApplicationAdapter {
                     comparedFiles++;
                     String currentHash;
                     boolean isValidHash;
-                    if (comparisonMode.equals(SEARCH)) {
+                    if (mode.equals(HASH_COMPARE)) {
                         currentHash = getFileChecksum(file.getAbsoluteFile());
                         isValidHash = currentHash.length() > 1;
                     } else {
@@ -1546,25 +1558,19 @@ public class Main extends ApplicationAdapter {
 
         renderer.begin();
         renderer.set(ShapeRenderer.ShapeType.Filled);
-        long cachedMem = Runtime.getRuntime().totalMemory();
-        long freeMem = Runtime.getRuntime().freeMemory();
-        long usedMem = cachedMem - freeMem;
 
         renderer.setColor(Color.GOLDENROD);
-        renderer.rect(400, 0, (float) (cachedMem * memDisplayFactor), 20);
+        renderer.rect(400, 0, getCachedMemInPixels(), 20);
         renderer.setColor(Color.valueOf("#007700"));
-        renderer.rect(400, 0, (float) (usedMem * memDisplayFactor), 20);
+        renderer.rect(400, 0, getUsedMemInPixels(), 20);
         renderer.setColor(Color.FIREBRICK);
-        renderer.rect((float) (400 + maxMemUsage * memDisplayFactor), 0, 3, 20);
-        if (usedMem > maxMemUsage) {
-            maxMemUsage = usedMem;
-        }
+        renderer.rect(getMaxMemoryUsageInPixels(), 0, 3, 20);
         renderer.set(ShapeRenderer.ShapeType.Line);
         renderer.setColor(Color.WHITE);
         renderer.rect(400, 0, 400, 20);
         renderer.end();
         batch.begin();
-        font.draw(batch, "[#FFFFFF]Memory usage: " + formatNumber(convertToGigabytes(usedMem)) + "/" + formatNumber(convertToGigabytes(availableMem)) + "Gb, max: " + formatNumber(convertToGigabytes(maxMemUsage)) + "Gb", 400, 16, 400, -1, false);
+        font.draw(batch, "[#FFFFFF]Memory usage: " + getUsedMemInGb() + "/" + getAvailableMemoryInGb() + "Gb, max: " + getMaxMemoryUsageInGb() + "Gb", 400, 16, 400, -1, false);
         batch.end();
 
         if (currentlySortingFolders) {

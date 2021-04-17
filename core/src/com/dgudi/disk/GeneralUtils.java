@@ -1,8 +1,12 @@
 package com.dgudi.disk;
 
+import java.io.File;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+
+import static com.dgudi.disk.EXIFUtils.getImageCameraModel;
+import static com.dgudi.disk.EXIFUtils.getImageCreationDate;
 
 public class GeneralUtils {
 
@@ -28,11 +32,11 @@ public class GeneralUtils {
     }
 
     static double convertToGigabytes(long bytes) {
-        return bytes / 1024d / 1024d / 1024d;
+        return bytes / 1000d / 1000d / 1000d;
     }
 
     static double convertToMegabytes(long bytes) {
-        return bytes / 1024d / 1024d;
+        return bytes / 1000d / 1000d;
     }
 
     static String normaliseLength(String input, int targetLength) {
@@ -57,4 +61,12 @@ public class GeneralUtils {
         }
         return percentage_string;
     }
+
+    static boolean hasBeenRenamed(File file){
+        String creationDate = getImageCreationDate(file);
+        String cameraModel = getImageCameraModel(file);
+        return file.getName().startsWith(creationDate) && file.getName().contains(cameraModel);
+    }
+
+
 }

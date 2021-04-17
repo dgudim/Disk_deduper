@@ -1,8 +1,8 @@
 {
-  "searchNames": "Compare [#FFDD00]files[] by [#00DDFF]name[] and show results in groups for further action",
-  "search": "Compare [#FFDD00]files[] by [#00DDFF]hash[] and show results in groups for further action",
-  "comp2f": "Compare [#00DDFF]master[] folder and [#FF5555]slave[] folders by hash (Files from the [#FF5555]slave[] folders are moved into the [#FFDD00]dupes[] folder if they are present in the [#00DDFF]master[] folder)",
-  "comp2fR": "Compare [#00DDFF]master[] folder and [#FF5555]slave[] folders by hash ([#FF5555]DELETED_[] is added to the name of a file from the [#FF5555]slave[] folders if it is present in the [#00DDFF]master[] folder)",
-  "exifSort": "Rename files according to their [#00DDFF]EXIF data[] ([#FFDD00]Name format[]: [#FFFF33]creation date and time[]_[#FF77FF]camera model[]_[#77FFFF]numbers from file name[])",
-  "stats": "Get statistics of selected folders ([#00DDFF]Extensions[], [#FFFF33]camera models[], [#FF77FF]empty folders[]) and write them into a text file"
+  "NAME_COMPARE": "Compare [#FFDD00]files[] by [#00DDFF]name[] and show results in groups for further action",
+  "HASH_COMPARE": "Compare [#FFDD00]files[] by [#00DDFF]hash[] and show results in groups for further action",
+  "COMPARE_2_FOLDERS_MOVE": "Compare [#00DDFF]master[] folder and [#FF5555]slave[] folders by hash (Files from the [#FF5555]slave[] folders are moved into the [#FFDD00]dupes[] folder if they are present in the [#00DDFF]master[] folder)",
+  "COMPARE_2_FOLDERS_RENAME": "Compare [#00DDFF]master[] folder and [#FF5555]slave[] folders by hash ([#FF5555]DELETED_[] is added to the name of a file from the [#FF5555]slave[] folders if it is present in the [#00DDFF]master[] folder)",
+  "EXIF_SORT": "Rename files according to their [#00DDFF]EXIF data[] ([#FFDD00]Name format[]: [#FFFF33]creation date and time[]_[#FF77FF]camera model[]_[#77FFFF]numbers from file name[])",
+  "SHOW_STATS": "Get statistics of selected folders ([#00DDFF]Extensions[], [#FFFF33]camera models[], [#FF77FF]empty folders[]) and write them into a text file"
 }

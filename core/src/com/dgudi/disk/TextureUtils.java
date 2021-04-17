@@ -13,8 +13,8 @@ import java.io.File;
 import java.util.ArrayList;
 
 import static com.dgudi.disk.EXIFUtils.preloadUnknownFormatThumbnail;
+import static com.dgudi.disk.FileUtils.deletedMessage;
 import static com.dgudi.disk.GeneralUtils.convertToMegabytes;
-import static com.dgudi.disk.Main.deletedMessage;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 

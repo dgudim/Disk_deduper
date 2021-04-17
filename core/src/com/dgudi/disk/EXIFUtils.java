@@ -120,8 +120,16 @@ public class EXIFUtils {
         if (origFileName.replaceAll("[^0-9]", "").length() > 1) {
             origFileName = origFileName.replaceAll("[^0-9]", "");
         }
-
-        String additionalData = getImageCreationDate(file) + "_" + getImageCameraModel(file);
+        String cameraModel = getImageCameraModel(file);
+        String creationDate = getImageCreationDate(file);
+        String additionalData = "";
+        if (creationDate.length() > 0 && cameraModel.length() > 0) {
+            additionalData = creationDate + "_" + cameraModel;
+        }else if (cameraModel.length() > 0){
+            additionalData = cameraModel;
+        }else if (creationDate.length() > 0){
+            additionalData = creationDate;
+        }
         String toReturn = origFileName + extension;
         if (additionalData.length() > 1) {
             toReturn = additionalData + "_" + toReturn;

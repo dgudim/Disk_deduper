@@ -11,13 +11,13 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 
-import static com.dgudi.disk.Main.deletedMessage;
-
 public class FileUtils {
 
     final static String saveDirectory = "DiskScanPreferences\\";
     final static FileHandle paramsFile = Gdx.files.external(saveDirectory + "params.txt");
     final static long moveThreadDelay = 50;
+    final static int emptyDirectorySize = 5000;
+    final static String deletedMessage = "_DELETED_";
 
     public static ArrayList<File> getAllFiles(String path) {
         File root = new File(path);
