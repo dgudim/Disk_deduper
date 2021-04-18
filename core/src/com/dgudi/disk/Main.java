@@ -3,6 +3,7 @@ package com.dgudi.disk;
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
@@ -44,12 +45,16 @@ import de.tomgrill.gdxdialogs.core.GDXDialogsSystem;
 import de.tomgrill.gdxdialogs.core.dialogs.GDXButtonDialog;
 import de.tomgrill.gdxdialogs.core.listener.ButtonClickListener;
 
+import static com.dgudi.disk.EXIFUtils.canExtractExifData;
 import static com.dgudi.disk.EXIFUtils.getImageCameraModel;
 import static com.dgudi.disk.EXIFUtils.getImageCreationDateAndCameraModel;
 import static com.dgudi.disk.FileUtils.callFileChooser;
 import static com.dgudi.disk.FileUtils.emptyDirectorySize;
 import static com.dgudi.disk.FileUtils.getAllDirectories;
 import static com.dgudi.disk.FileUtils.getAllFiles;
+import static com.dgudi.disk.FileUtils.getDirectoriesSizeFromFiles;
+import static com.dgudi.disk.FileUtils.getDirectoriesSizeFromPaths;
+import static com.dgudi.disk.FileUtils.getDirectorySize;
 import static com.dgudi.disk.FileUtils.getFilePathWithoutName;
 import static com.dgudi.disk.FileUtils.loadObject;
 import static com.dgudi.disk.FileUtils.markAsDeleted;
@@ -125,11 +130,13 @@ public class Main extends ApplicationAdapter {
     public static String currentHash = "";
     public static String currentErrorMessage = "";
     int allFilesCalculated = 1;
+    long allMemoryCalculated = 1;
     final HashMap<String, String> hashedFiles = new HashMap<>();
     int allFiles = 0;
-    int prevFiles = 0;
-    final int filesPerSecSmoothingFrame = 15;
-    float[] filesPerSecSmoothing;
+    long allMemory = 0;
+    long prevMemory = 0;
+    final int memPerSecSmoothingFrame = 15;
+    float[] memPerSecSmoothing;
     int comparedFiles = 0;
     int duplicatesOriginal = 0;
     int duplicates = 0;
@@ -139,6 +146,9 @@ public class Main extends ApplicationAdapter {
     ArrayList<String> dupes_second_part = new ArrayList<>();
     long startTime;
     boolean extensionFilterEnabled = true;
+
+    boolean playCompletionSound = false;
+    Sound completionSoundEffect;
 
     Mode mode = NAME_COMPARE;
 
@@ -189,15 +199,15 @@ public class Main extends ApplicationAdapter {
 
     GDXDialogs dialogs;
 
-    MemoryUtils memoryUtils;
-
     @Override
     @SuppressWarnings("unchecked")
     public void create() {
 
         MemoryUtils.setDisplayFactor(400);
 
-        filesPerSecSmoothing = new float[filesPerSecSmoothingFrame * 60];
+        completionSoundEffect = Gdx.audio.newSound(Gdx.files.internal("completed.ogg"));
+
+        memPerSecSmoothing = new float[memPerSecSmoothingFrame * 60];
 
         dialogs = GDXDialogsSystem.install();
 
@@ -829,7 +839,7 @@ public class Main extends ApplicationAdapter {
     void startScan() {
         allFiles = 0;
         comparedFiles = 0;
-        prevFiles = 0;
+        prevMemory = 0;
         new Thread(new Runnable() {
             public void run() {
                 startTime = System.currentTimeMillis();
@@ -838,6 +848,8 @@ public class Main extends ApplicationAdapter {
                     case COMPARE_2_FOLDERS_RENAME:
                         ArrayList<File> files_master = getAllFiles(masterPath);
                         allFilesCalculated = files_master.size();
+                        allMemoryCalculated = getDirectorySize(masterPath);
+
                         for (File master_file : files_master) {
                             if (filterExtension(master_file)) {
                                 String hash = getFileChecksum(master_file);
@@ -845,12 +857,12 @@ public class Main extends ApplicationAdapter {
                                     hashedFiles.put(hash, master_file.toString());
                                 }
                             }
-                            allFiles++;
+                            addTotalNumberOfFiles(master_file);
                         }
                         for (String slavePath : slaveFolders) {
                             ArrayList<File> files_slave = getAllFiles(slavePath);
                             allFilesCalculated += files_slave.size();
-
+                            allMemoryCalculated += getDirectoriesSizeFromFiles(files_slave);
                             for (File slave_file : files_slave) {
                                 if (filterExtension(slave_file)) {
                                     String hash = getFileChecksum(slave_file);
@@ -867,9 +879,10 @@ public class Main extends ApplicationAdapter {
                                     currentFile = slave_file.toString();
                                     comparedFiles++;
                                 }
-                                allFiles++;
+                                addTotalNumberOfFiles(slave_file);
                             }
                         }
+                        playCompletionSound = true;
                         break;
                     case HASH_COMPARE:
                     case NAME_COMPARE:
@@ -880,6 +893,7 @@ public class Main extends ApplicationAdapter {
                                     filesCalculated += getAllFiles(folderPath).size();
                                 }
                                 allFilesCalculated = filesCalculated;
+                                allMemoryCalculated = getDirectoriesSizeFromPaths(foldersToSearch);
                             }
                         }).start();
                         for (String folderPath : foldersToSearch) {
@@ -1010,13 +1024,11 @@ public class Main extends ApplicationAdapter {
                         }
 
                         allFilesCalculated = files.size();
+                        allMemoryCalculated = getDirectoriesSizeFromPaths(foldersToSearch);
 
                         for (int i = 0; i < files.size(); i++) {
                             String fileName = files.get(i).getName().toLowerCase().trim();
-                            if (fileName.endsWith(".cr2")
-                                    || fileName.endsWith(".jpg")
-                                    || fileName.endsWith(".mp4")
-                                    || fileName.endsWith(".tiff")) {
+                            if (canExtractExifData(fileName) && filterExtension(files.get(i))) {
                                 String newFileName = getFilePathWithoutName(files.get(i).getAbsolutePath()) + "\\" + getImageCreationDateAndCameraModel(files.get(i));
                                 currentFile = files.get(i).toString();
                                 currentHash = newFileName;
@@ -1042,8 +1054,9 @@ public class Main extends ApplicationAdapter {
                                     dupes_merged.add(getFilePathWithoutName(files.get(i).getAbsolutePath()) + " : " + additionalMessage + message);
                                 }
                             }
-                            allFiles++;
+                            addTotalNumberOfFiles(files.get(i));
                         }
+                        playCompletionSound = true;
                         break;
                     }
                     case SHOW_STATS: {
@@ -1066,6 +1079,7 @@ public class Main extends ApplicationAdapter {
                             filesAndFolders.addAll(getAllDirectories(foldersToSearch.get(i)));
                         }
                         allFilesCalculated = filesAndFolders.size();
+                        allMemoryCalculated = getDirectoriesSizeFromPaths(foldersToSearch);
                         long allFileSizes = 0;
                         for (File file : filesAndFolders) {
                             currentFile = file.getAbsolutePath();
@@ -1098,7 +1112,7 @@ public class Main extends ApplicationAdapter {
                                     currentHash = cameraModel + " " + cameraModels.get(cameraModel);
                                 }
                             } else {
-                                if (file.length() < emptyDirectorySize) {
+                                if (getDirectorySize(file.getAbsolutePath()) < emptyDirectorySize) {
                                     ArrayList<File> allFoldersAndFiles = getAllFiles(file.getAbsolutePath());
                                     ArrayList<String> allFilesAndFolders_onlyNames = new ArrayList<>();
                                     for (File contentEntry : allFoldersAndFiles) {
@@ -1109,7 +1123,7 @@ public class Main extends ApplicationAdapter {
                                 }
                             }
                             comparedFiles++;
-                            allFiles++;
+                            addTotalNumberOfFiles(file);
                         }
                         StringBuilder results = new StringBuilder();
                         results.append("Detected camera models:").append(cameraModels.size()).append("\n");
@@ -1219,6 +1233,8 @@ public class Main extends ApplicationAdapter {
                         dupes_merged.clear();
                         dupes_merged.add(results.toString());
                     }
+                    playCompletionSound = true;
+                    break;
                 }
                 currentFile = "Finished! took " + getElapsedTime(startTime) + " min";
                 currentHash = "";
@@ -1227,9 +1243,14 @@ public class Main extends ApplicationAdapter {
                 if (currentCommits > 0) {
                     saveHashBase();
                 }
-                Arrays.fill(filesPerSecSmoothing, 0);
+                Arrays.fill(memPerSecSmoothing, 0);
             }
         }).start();
+    }
+
+    void addTotalNumberOfFiles(File file) {
+        allFiles++;
+        allMemory += file.length();
     }
 
     void commitDupe(File file) {
@@ -1276,7 +1297,7 @@ public class Main extends ApplicationAdapter {
                 break;
             }
         }
-        if(!addToList){
+        if (!addToList) {
             currentErrorMessage = "[#00DDFF]Info: skipped file " + file;
         }
         return addToList;
@@ -1292,7 +1313,7 @@ public class Main extends ApplicationAdapter {
             if (file.isDirectory()) {
                 walk(file.getAbsolutePath());
             } else {
-                allFiles++;
+                addTotalNumberOfFiles(file);
                 if (filterExtension(file)) {
                     currentFile = file.getAbsoluteFile().toString();
                     comparedFiles++;
@@ -1374,7 +1395,7 @@ public class Main extends ApplicationAdapter {
         preview.setScaling(Scaling.fit);
         entryTable.add(preview).size(250).row();
         TextButton name = makeTextButton(imageFile.getName() + ", \n"
-                + dupesLeft.get(indexInArray) + " dupes left, hash: " + fileHashes.get(indexInArray).substring(0, 10) + "..., size: "+formatNumber(convertToMegabytes(imageFile.length()))+"Mb", 150, 65, 0);
+                + dupesLeft.get(indexInArray) + " dupes left, hash: " + fileHashes.get(indexInArray).substring(0, 10) + "..., size: " + formatNumber(convertToMegabytes(imageFile.length())) + "Mb", 150, 65, 0);
 
         name.addListener(new ClickListener() {
             @Override
@@ -1423,20 +1444,25 @@ public class Main extends ApplicationAdapter {
         Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        float filesPerSec_current = (allFiles - prevFiles) / Gdx.graphics.getDeltaTime();
+        if(playCompletionSound){
+            completionSoundEffect.play();
+        }
 
-        float filesPerSec = 0;
-        for (int i = 0; i < filesPerSecSmoothing.length; i++) {
-            filesPerSec += filesPerSecSmoothing[i];
+        float memPerSec_current = (allMemory - prevMemory) / Gdx.graphics.getDeltaTime();
+
+        float memPerSec_raw = 0;
+        for (int i = 0; i < memPerSecSmoothing.length; i++) {
+            memPerSec_raw += memPerSecSmoothing[i];
             if (i > 0) {
-                filesPerSecSmoothing[i - 1] = filesPerSecSmoothing[i];
+                memPerSecSmoothing[i - 1] = memPerSecSmoothing[i];
             }
         }
-        filesPerSecSmoothing[filesPerSecSmoothing.length - 1] = filesPerSec_current;
-        filesPerSec = (float) formatNumber(filesPerSec / (float) filesPerSecSmoothing.length);
+        memPerSecSmoothing[memPerSecSmoothing.length - 1] = memPerSec_current;
+        memPerSec_raw = memPerSec_raw / (float) memPerSecSmoothing.length;
 
-        float minutesLeft = (float) formatNumber((allFilesCalculated - allFiles) / filesPerSec / 60f);
-        prevFiles = allFiles;
+        float minutesLeft = (float) formatNumber((allMemoryCalculated - allMemory) / memPerSec_raw / 60f);
+        float memPerSec = (float) formatNumber(convertToMegabytes((long) memPerSec_raw));
+        prevMemory = allMemory;
 
         if (currentlyPreLoadingPreviews) {
             ArrayList<String> loadFrom_left = sortedFilesArray_leftPart.get(preloadGroupIndex);
@@ -1451,6 +1477,7 @@ public class Main extends ApplicationAdapter {
             } else {
                 currentlyPreLoadingPreviews = false;
                 currentlyLoadingPreviews = true;
+                playCompletionSound = true;
             }
         }
 
@@ -1630,8 +1657,8 @@ public class Main extends ApplicationAdapter {
             font.draw(batch, "[#00FF00]" + currentFile, 10, 68, 800, -1, false);
             font.draw(batch, "[#00FF00]" + currentHash, 10, 52, 800, -1, false);
             font.draw(batch, "[#00FF00]" + currentErrorMessage, 10, 85, 800, -1, false);
-            font.draw(batch, "[#00FF00]" + comparedFiles + " files compared, " + (int) filesPerSec + " Files per sec, " + minutesLeft + " min left", 10, 35, 800, -1, false);
-            font.draw(batch, "[#00FF00]" + allFiles + " files scanned(" + normaliseLength(formatNumber(allFiles / (float) allFilesCalculated * 100) + "%", 6) + ") out of " + allFilesCalculated, 10, 16, 800, -1, false);
+            font.draw(batch, "[#00FF00]" + comparedFiles + " files compared, " + memPerSec + " Mb per sec, " + minutesLeft + " min left", 10, 35, 800, -1, false);
+            font.draw(batch, "[#00FF00]" + allFiles + " files scanned(" + normaliseLength(formatNumber(allMemory / (float) allMemoryCalculated * 100) + "%", 6) + ") out of " + allFilesCalculated, 10, 16, 800, -1, false);
             font.draw(batch, "[#00FF00]" + duplicatesOriginal + " dupes found", 10, 121, 800, -1, false);
             font.draw(batch, "[#00FF00]" + formatNumber(dupesSize) + "Gb", 10, 102, 800, -1, false);
             font.draw(batch, "[#00FF00]" + getElapsedTime(startTime) + " minutes passed", 10, 141, 800, -1, false);
@@ -1667,6 +1694,7 @@ public class Main extends ApplicationAdapter {
         uiAtlas.dispose();
         font.dispose();
         stage.dispose();
+        completionSoundEffect.dispose();
     }
 }
 

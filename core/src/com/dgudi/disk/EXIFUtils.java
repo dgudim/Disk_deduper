@@ -21,7 +21,18 @@ import javax.imageio.ImageIO;
 
 public class EXIFUtils {
 
+    private static final String[] supportedFormats = new String[]{"jpeg", "jpg", "tiff", "webp", "wav", "avi", "psd", "png", "bmp", "gif", "ico", "pcx", "quicktime", "mp4", "nef", "cr2", "orf", "arw", "rw2", "rwl", "srw"};
+
     static JsonValue cameraNamesMap = new JsonReader().parse(Gdx.files.internal("cameraNamesMap.json"));
+
+    static boolean canExtractExifData(String name){
+        for (String ext : supportedFormats) {
+            if (name.endsWith(ext.toLowerCase())) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     static String mapCameraModel(String originalName) {
         try {
@@ -125,9 +136,9 @@ public class EXIFUtils {
         String additionalData = "";
         if (creationDate.length() > 0 && cameraModel.length() > 0) {
             additionalData = creationDate + "_" + cameraModel;
-        }else if (cameraModel.length() > 0){
+        } else if (cameraModel.length() > 0) {
             additionalData = cameraModel;
-        }else if (creationDate.length() > 0){
+        } else if (creationDate.length() > 0) {
             additionalData = creationDate;
         }
         String toReturn = origFileName + extension;
