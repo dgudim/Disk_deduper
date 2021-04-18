@@ -11,6 +11,10 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 
+import javax.swing.JFileChooser;
+
+import static com.dgudi.disk.Main.filterFolder;
+
 public class FileUtils {
 
     final static String saveDirectory = "DiskScanPreferences\\";
@@ -24,7 +28,7 @@ public class FileUtils {
         File[] list = root.listFiles();
         ArrayList<File> foundFiles = new ArrayList<>();
 
-        if (list == null) return new ArrayList<>();
+        if (list == null || !filterFolder(root)) return new ArrayList<>();
 
         for (final File f : list) {
             if (f.isDirectory()) {
@@ -43,12 +47,12 @@ public class FileUtils {
         File[] list = root.listFiles();
         ArrayList<File> foundDirectories = new ArrayList<>();
 
-        if (list == null) return new ArrayList<>();
+        if (list == null || !filterFolder(root)) return new ArrayList<>();
 
         for (final File f : list) {
             if (f.isDirectory()) {
                 foundDirectories.add(f);
-                foundDirectories.addAll(getAllFiles(f.getAbsolutePath()));
+                foundDirectories.addAll(getAllDirectories(f.getAbsolutePath()));
             }
         }
 
@@ -115,4 +119,27 @@ public class FileUtils {
         s.close();
     }
 
+    static void callFileChooser(FileDialogueAction action, boolean multiSelect) {
+        JFileChooser jFileChooser = new JFileChooser(new File("C:\\"));
+        jFileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        jFileChooser.setMultiSelectionEnabled(multiSelect);
+
+        int returnVal = jFileChooser.showOpenDialog(null);
+
+        if (returnVal == JFileChooser.APPROVE_OPTION) {
+            if (multiSelect) {
+                action.performAction(jFileChooser.getSelectedFiles());
+            } else {
+                action.performAction(new File[]{jFileChooser.getSelectedFile()});
+            }
+        }
+
+    }
+
+}
+
+class FileDialogueAction {
+    void performAction(File[] selectedFiles) {
+
+    }
 }

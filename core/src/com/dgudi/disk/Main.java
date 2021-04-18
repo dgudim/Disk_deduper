@@ -39,8 +39,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 
-import javax.swing.JFileChooser;
-
 import de.tomgrill.gdxdialogs.core.GDXDialogs;
 import de.tomgrill.gdxdialogs.core.GDXDialogsSystem;
 import de.tomgrill.gdxdialogs.core.dialogs.GDXButtonDialog;
@@ -48,6 +46,7 @@ import de.tomgrill.gdxdialogs.core.listener.ButtonClickListener;
 
 import static com.dgudi.disk.EXIFUtils.getImageCameraModel;
 import static com.dgudi.disk.EXIFUtils.getImageCreationDateAndCameraModel;
+import static com.dgudi.disk.FileUtils.callFileChooser;
 import static com.dgudi.disk.FileUtils.emptyDirectorySize;
 import static com.dgudi.disk.FileUtils.getAllDirectories;
 import static com.dgudi.disk.FileUtils.getAllFiles;
@@ -61,6 +60,7 @@ import static com.dgudi.disk.FileUtils.saveObject;
 import static com.dgudi.disk.FileUtils.sleep;
 import static com.dgudi.disk.GeneralUtils.calculatePercentage;
 import static com.dgudi.disk.GeneralUtils.convertToGigabytes;
+import static com.dgudi.disk.GeneralUtils.convertToMegabytes;
 import static com.dgudi.disk.GeneralUtils.formatNumber;
 import static com.dgudi.disk.GeneralUtils.getCurrentDate;
 import static com.dgudi.disk.GeneralUtils.getCurrentTime;
@@ -91,7 +91,7 @@ import static com.dgudi.disk.TextureUtils.unloadAllTextures;
 import static java.lang.Math.min;
 
 enum Mode {
-    NAME_COMPARE, HASH_COMPARE, COMPARE_2_FOLDERS_MOVE, COMPARE_2_FOLDERS_RENAME, EXIF_SORT, SHOW_STATS;
+    NAME_COMPARE, HASH_COMPARE, COMPARE_2_FOLDERS_MOVE, COMPARE_2_FOLDERS_RENAME, EXIF_SORT, SHOW_STATS
 }
 
 public class Main extends ApplicationAdapter {
@@ -149,6 +149,8 @@ public class Main extends ApplicationAdapter {
     ArrayList<String> slaveFolders;
     ArrayList<String> foldersToSearch;
     ArrayList<String> extensionsToSearch;
+    static ArrayList<String> foldersNotToSearch;
+    ArrayList<String> extensionsNotToSearch;
 
     String foldersToSearch_string;
     String extensionsToSearch_string;
@@ -196,8 +198,6 @@ public class Main extends ApplicationAdapter {
         MemoryUtils.setDisplayFactor(400);
 
         filesPerSecSmoothing = new float[filesPerSecSmoothingFrame * 60];
-
-        readHashBase();
 
         dialogs = GDXDialogsSystem.install();
 
@@ -382,7 +382,11 @@ public class Main extends ApplicationAdapter {
                 CustomTextInputListener listener = new CustomTextInputListener() {
                     @Override
                     public void input(String text) {
-                        extensionsToSearch.add(text);
+                        if (extensionFilterEnabled) {
+                            extensionsToSearch.add(text);
+                        } else {
+                            extensionsNotToSearch.add(text);
+                        }
                         saveParams();
                         reloadExtensionsString();
                     }
@@ -394,16 +398,28 @@ public class Main extends ApplicationAdapter {
         addFolder.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                callFileChooser(new FileDialogueAction() {
-                    @Override
-                    void performAction(File[] selectedFiles) {
-                        for (File file : selectedFiles) {
-                            foldersToSearch.add(file.toString());
-                        }
-                        saveParams();
-                        reloadFoldersString();
-                    }
-                }, true);
+                callDialogue("Add a folder to scan", "", "Whitelist", "Blacklist", "Cancel",
+                        new GeneralDialogueAction() {
+                            @Override
+                            void performAction(final int button) {
+                                if (button != 2) {
+                                    callFileChooser(new FileDialogueAction() {
+                                        @Override
+                                        void performAction(File[] selectedFiles) {
+                                            for (File file : selectedFiles) {
+                                                if (button == 0) {
+                                                    foldersToSearch.add(file.toString());
+                                                } else if (button == 1) {
+                                                    foldersNotToSearch.add(file.toString());
+                                                }
+                                            }
+                                            saveParams();
+                                            reloadFoldersString();
+                                        }
+                                    }, true);
+                                }
+                            }
+                        });
             }
         });
 
@@ -411,6 +427,7 @@ public class Main extends ApplicationAdapter {
             @Override
             public void clicked(InputEvent event, float x, float y) {
                 foldersToSearch.clear();
+                foldersNotToSearch.clear();
                 slaveFolders.clear();
                 saveParams();
                 reloadFoldersString();
@@ -421,6 +438,7 @@ public class Main extends ApplicationAdapter {
             @Override
             public void clicked(InputEvent event, float x, float y) {
                 extensionsToSearch.clear();
+                extensionsNotToSearch.clear();
                 saveParams();
                 reloadExtensionsString();
             }
@@ -497,6 +515,8 @@ public class Main extends ApplicationAdapter {
                         }
                     });
         }
+
+        readHashBase();
 
         reloadFoldersString();
         reloadExtensionsString();
@@ -593,23 +613,6 @@ public class Main extends ApplicationAdapter {
                         }
                     });
         }
-    }
-
-    void callFileChooser(FileDialogueAction action, boolean multiSelect) {
-        JFileChooser jFileChooser = new JFileChooser(new File("C:\\"));
-        jFileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        jFileChooser.setMultiSelectionEnabled(multiSelect);
-
-        int returnVal = jFileChooser.showOpenDialog(null);
-
-        if (returnVal == JFileChooser.APPROVE_OPTION) {
-            if (multiSelect) {
-                action.performAction(jFileChooser.getSelectedFiles());
-            } else {
-                action.performAction(new File[]{jFileChooser.getSelectedFile()});
-            }
-        }
-
     }
 
     void updateModeDescription() {
@@ -724,6 +727,8 @@ public class Main extends ApplicationAdapter {
         String[] allParams = new String[]{};
         foldersToSearch = new ArrayList<>();
         extensionsToSearch = new ArrayList<>();
+        foldersNotToSearch = new ArrayList<>();
+        extensionsNotToSearch = new ArrayList<>();
         slaveFolders = new ArrayList<>();
 
         if (!paramsFile.exists()) {
@@ -748,27 +753,35 @@ public class Main extends ApplicationAdapter {
             if (param.startsWith("ext_")) {
                 extensionsToSearch.add(param.substring(4));
             }
+            if (param.startsWith("extBlacklist_")) {
+                extensionsNotToSearch.add(param.substring(13));
+            }
             if (param.startsWith("extension_filter_off")) {
                 extensionFilterEnabled = false;
             }
             if (param.startsWith("fold_")) {
                 foldersToSearch.add(param.substring(5));
             }
+            if (param.startsWith("foldBlacklist_")) {
+                foldersNotToSearch.add(param.substring(14));
+            }
+        }
+    }
+
+    void appendParams(String paramId, StringBuilder appendTo, ArrayList<String> params) {
+        for (String parameter : params) {
+            appendTo.append(paramId).append(parameter).append("\r\n");
         }
     }
 
     void saveParams() {
         StringBuilder paramsToWrite = new StringBuilder();
         paramsToWrite.append("c_mode_").append(mode).append("\r\n");
-        for (String folderPath : foldersToSearch) {
-            paramsToWrite.append("fold_").append(folderPath).append("\r\n");
-        }
-        for (String extension : extensionsToSearch) {
-            paramsToWrite.append("ext_").append(extension).append("\r\n");
-        }
-        for (String slavePath : slaveFolders) {
-            paramsToWrite.append("foldSlave_").append(slavePath).append("\r\n");
-        }
+        appendParams("fold_", paramsToWrite, foldersToSearch);
+        appendParams("foldBlacklist_", paramsToWrite, foldersNotToSearch);
+        appendParams("ext_", paramsToWrite, extensionsToSearch);
+        appendParams("extBlacklist_", paramsToWrite, extensionsNotToSearch);
+        appendParams("foldSlave_", paramsToWrite, slaveFolders);
         paramsToWrite.append("foldMaster_").append(masterPath).append("\r\n");
         paramsToWrite.append("foldDupe_").append(clonePath).append("\r\n");
         if (!extensionFilterEnabled) {
@@ -780,14 +793,12 @@ public class Main extends ApplicationAdapter {
     void reloadFoldersString() {
         StringBuilder builder = new StringBuilder();
         builder.append("[#00FF00]Folders to search: (").append(foldersToSearch.size()).append(")\n");
-        for (String folderPath : foldersToSearch) {
-            builder.append(folderPath).append("\n");
-        }
-        builder.append("[#00DDFF]Master folder:").append(masterPath).append("\n");
+        appendParams("", builder, foldersToSearch);
+        builder.append("\n[#FFFF00]Folders not to search(Blacklist): (").append(foldersNotToSearch.size()).append(")\n");
+        appendParams("", builder, foldersNotToSearch);
+        builder.append("\n[#00DDFF]Master folder:").append(masterPath).append("\n");
         builder.append("[#FF5555]Slave folders: (").append(slaveFolders.size()).append(")\n");
-        for (String slavePath : slaveFolders) {
-            builder.append(slavePath).append("\n");
-        }
+        appendParams("", builder, slaveFolders);
         builder.append("[#FFDD00]Clone folder:").append(clonePath);
         foldersToSearch_string = builder.toString();
     }
@@ -798,11 +809,11 @@ public class Main extends ApplicationAdapter {
         if (extensionFilterEnabled) {
             builder.append("ENABLED\n");
         } else {
-            builder.append("[#FF5555]DISABLED(search all)[#00FF00]\n");
+            builder.append("[#FF5555]DISABLED(Blacklist enabled)[#00FF00]\n");
         }
-        for (int i = 0; i < extensionsToSearch.size(); i++) {
-            builder.append(extensionsToSearch.get(i)).append("\n");
-        }
+        appendParams("", builder, extensionsToSearch);
+        builder.append("\n[#FFFF00]Extensions not to search(Blacklist): (").append(extensionsNotToSearch.size()).append(")\n");
+        appendParams("", builder, extensionsNotToSearch);
         extensionsToSearch_string = builder.toString();
     }
 
@@ -1232,6 +1243,16 @@ public class Main extends ApplicationAdapter {
         dupesSize += convertToGigabytes(fileSize);
     }
 
+    static boolean filterFolder(File folder) {
+        for (String blacklistedFolder : foldersNotToSearch) {
+            if (folder.getAbsoluteFile().toString().toLowerCase().endsWith(blacklistedFolder.toLowerCase())) {
+                currentErrorMessage = "[#00DDFF]Info: skipped folder " + folder;
+                return false;
+            }
+        }
+        return true;
+    }
+
     boolean filterExtension(File file) {
         boolean addToList = !extensionFilterEnabled;
         if (extensionFilterEnabled) {
@@ -1241,20 +1262,31 @@ public class Main extends ApplicationAdapter {
                     break;
                 }
             }
+        } else {
+            for (String ext : extensionsNotToSearch) {
+                if (file.getAbsoluteFile().toString().toLowerCase().endsWith(ext.toLowerCase())) {
+                    addToList = false;
+                    break;
+                }
+            }
         }
         for (String ext : excludedFormats) {
             if (file.getAbsoluteFile().toString().toLowerCase().endsWith(ext.toLowerCase())) {
-                return false;
+                addToList = false;
+                break;
             }
+        }
+        if(!addToList){
+            currentErrorMessage = "[#00DDFF]Info: skipped file " + file;
         }
         return addToList;
     }
 
     public void walk(String path) {
+        File root = new File(path);
+        File[] list = root.listFiles();
 
-        File[] list = new File(path).listFiles();
-
-        if (list == null) return;
+        if (list == null || !filterFolder(root)) return;
 
         for (final File file : list) {
             if (file.isDirectory()) {
@@ -1340,9 +1372,9 @@ public class Main extends ApplicationAdapter {
         preview = new Image(loadPreview(path));
 
         preview.setScaling(Scaling.fit);
-        entryTable.add(preview).size(150).row();
+        entryTable.add(preview).size(250).row();
         TextButton name = makeTextButton(imageFile.getName() + ", \n"
-                + dupesLeft.get(indexInArray) + " dupes left, hash: " + fileHashes.get(indexInArray).substring(0, 10) + "...", 150, 65, 0);
+                + dupesLeft.get(indexInArray) + " dupes left, hash: " + fileHashes.get(indexInArray).substring(0, 10) + "..., size: "+formatNumber(convertToMegabytes(imageFile.length()))+"Mb", 150, 65, 0);
 
         name.addListener(new ClickListener() {
             @Override
@@ -1645,12 +1677,6 @@ class CustomTextInputListener implements Input.TextInputListener {
 
     @Override
     public void canceled() {
-    }
-}
-
-class FileDialogueAction {
-    void performAction(File[] selectedFiles) {
-
     }
 }
 
