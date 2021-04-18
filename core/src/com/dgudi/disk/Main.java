@@ -1444,8 +1444,9 @@ public class Main extends ApplicationAdapter {
         Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        if(playCompletionSound){
-            completionSoundEffect.play();
+        if (playCompletionSound) {
+            completionSoundEffect.play(1, 0.5f, 0);
+            playCompletionSound = false;
         }
 
         float memPerSec_current = (allMemory - prevMemory) / Gdx.graphics.getDeltaTime();
