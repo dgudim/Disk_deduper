@@ -23,18 +23,31 @@ public class FileUtils {
     final static int emptyDirectorySize = 5000;
     final static String deletedMessage = "_DELETED_";
 
-    public static long getDirectoriesSizeFromFiles(ArrayList<File> files) {
-        long dirSize = 0;
-        for (File file : files) {
-            dirSize += getDirectorySize(file.getAbsolutePath());
-        }
-        return dirSize;
-    }
-
     public static long getDirectoriesSizeFromPaths(ArrayList<String> paths) {
         long dirSize = 0;
         for (String path : paths) {
             dirSize += getDirectorySize(path);
+        }
+        return dirSize;
+    }
+
+    public static long getDirectorySize(String path, int sizeLimit) {
+        File root = new File(path);
+        File[] list = root.listFiles();
+        long dirSize = 0;
+
+        if (list == null || !filterFolder(root)) return 0;
+
+        for (final File f : list) {
+            if (f.isDirectory()) {
+                dirSize += getDirectorySize(f.getAbsolutePath(), sizeLimit);
+            } else {
+                Main.currentFile = f.toString();
+                dirSize += f.length();
+            }
+            if(dirSize > sizeLimit){
+                return dirSize;
+            }
         }
         return dirSize;
     }

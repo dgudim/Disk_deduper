@@ -52,7 +52,6 @@ import static com.dgudi.disk.FileUtils.callFileChooser;
 import static com.dgudi.disk.FileUtils.emptyDirectorySize;
 import static com.dgudi.disk.FileUtils.getAllDirectories;
 import static com.dgudi.disk.FileUtils.getAllFiles;
-import static com.dgudi.disk.FileUtils.getDirectoriesSizeFromFiles;
 import static com.dgudi.disk.FileUtils.getDirectoriesSizeFromPaths;
 import static com.dgudi.disk.FileUtils.getDirectorySize;
 import static com.dgudi.disk.FileUtils.getFilePathWithoutName;
@@ -82,12 +81,7 @@ import static com.dgudi.disk.MemoryUtils.getMaxMemoryUsageInGb;
 import static com.dgudi.disk.MemoryUtils.getMaxMemoryUsageInPixels;
 import static com.dgudi.disk.MemoryUtils.getUsedMemInGb;
 import static com.dgudi.disk.MemoryUtils.getUsedMemInPixels;
-import static com.dgudi.disk.Mode.COMPARE_2_FOLDERS_MOVE;
-import static com.dgudi.disk.Mode.COMPARE_2_FOLDERS_RENAME;
-import static com.dgudi.disk.Mode.EXIF_SORT;
-import static com.dgudi.disk.Mode.HASH_COMPARE;
-import static com.dgudi.disk.Mode.NAME_COMPARE;
-import static com.dgudi.disk.Mode.SHOW_STATS;
+import static com.dgudi.disk.Mode.*;
 import static com.dgudi.disk.TextureUtils.constructFilledImageWithColor;
 import static com.dgudi.disk.TextureUtils.createThumbnail;
 import static com.dgudi.disk.TextureUtils.excludedFormats;
@@ -848,7 +842,7 @@ public class Main extends ApplicationAdapter {
                     case COMPARE_2_FOLDERS_RENAME:
                         ArrayList<File> files_master = getAllFiles(masterPath);
                         allFilesCalculated = files_master.size();
-                        allMemoryCalculated = getDirectorySize(masterPath);
+                        allMemoryCalculated = getDirectorySize(masterPath) + getDirectoriesSizeFromPaths(slaveFolders);
 
                         for (File master_file : files_master) {
                             if (filterExtension(master_file)) {
@@ -859,10 +853,10 @@ public class Main extends ApplicationAdapter {
                             }
                             addTotalNumberOfFiles(master_file);
                         }
+
                         for (String slavePath : slaveFolders) {
                             ArrayList<File> files_slave = getAllFiles(slavePath);
                             allFilesCalculated += files_slave.size();
-                            allMemoryCalculated += getDirectoriesSizeFromFiles(files_slave);
                             for (File slave_file : files_slave) {
                                 if (filterExtension(slave_file)) {
                                     String hash = getFileChecksum(slave_file);
@@ -1112,7 +1106,7 @@ public class Main extends ApplicationAdapter {
                                     currentHash = cameraModel + " " + cameraModels.get(cameraModel);
                                 }
                             } else {
-                                if (getDirectorySize(file.getAbsolutePath()) < emptyDirectorySize) {
+                                if (getDirectorySize(file.getAbsolutePath(), emptyDirectorySize) < emptyDirectorySize) {
                                     ArrayList<File> allFoldersAndFiles = getAllFiles(file.getAbsolutePath());
                                     ArrayList<String> allFilesAndFolders_onlyNames = new ArrayList<>();
                                     for (File contentEntry : allFoldersAndFiles) {
