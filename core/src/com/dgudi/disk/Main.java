@@ -88,13 +88,14 @@ import static com.dgudi.disk.TextureUtils.excludedFormats;
 import static com.dgudi.disk.TextureUtils.loadPreview;
 import static com.dgudi.disk.TextureUtils.unloadAllTextures;
 import static java.lang.Math.min;
+import static java.lang.StrictMath.max;
 
 enum Mode {
     NAME_COMPARE, HASH_COMPARE, COMPARE_2_FOLDERS_MOVE, COMPARE_2_FOLDERS_RENAME, EXIF_SORT, SHOW_STATS
 }
 
 public class Main extends ApplicationAdapter {
-
+    
     OrthographicCamera camera;
     Viewport viewport;
     SpriteBatch batch;
@@ -108,7 +109,7 @@ public class Main extends ApplicationAdapter {
     Stage stage;
     Stage stage_results;
     ShapeRenderer renderer;
-
+    
     static TextButton startScan;
     static TextButton changeMode;
     TextButton commit;
@@ -119,7 +120,7 @@ public class Main extends ApplicationAdapter {
     static TextButton setClonePath;
     static TextButton removeAllExtensions;
     static TextButton addExtension;
-
+    
     public static String currentFile = "";
     public static String currentHash = "";
     public static String currentErrorMessage = "";
@@ -140,28 +141,28 @@ public class Main extends ApplicationAdapter {
     ArrayList<String> dupes_second_part = new ArrayList<>();
     long startTime;
     boolean extensionFilterEnabled = true;
-
+    
     boolean playCompletionSound = false;
     Sound completionSoundEffect;
-
+    
     Mode mode = NAME_COMPARE;
-
+    
     String comparisonMode_humanReadable;
-
+    
     String masterPath, clonePath;
-
+    
     ArrayList<String> slaveFolders;
     ArrayList<String> foldersToSearch;
     ArrayList<String> extensionsToSearch;
     static ArrayList<String> foldersNotToSearch;
     ArrayList<String> extensionsNotToSearch;
-
+    
     String foldersToSearch_string;
     String extensionsToSearch_string;
-
+    
     int commitCount;
     long lastCommitTime;
-
+    
     boolean resultsAvailable;
     boolean currentlyLoadingPreviews;
     boolean currentlyPreLoadingPreviews;
@@ -180,40 +181,40 @@ public class Main extends ApplicationAdapter {
     ArrayList<String> fileHashes = new ArrayList<>();
     ArrayList<Integer> indexMap = new ArrayList<>();
     ArrayList<ArrayList<Integer>> sortedFilesIndexMap = new ArrayList<>();
-
+    
     ArrayList<ArrayList<String>> sortedFilesArray_leftPart = new ArrayList<>();
     ArrayList<ArrayList<String>> sortedFilesArray_rightPart = new ArrayList<>();
     ArrayList<ArrayList<Integer>> sortedFilesArray_fingerprintMatch = new ArrayList<>();
     ArrayList<String> notSortedFilesArray_leftPart = new ArrayList<>();
     ArrayList<String> notSortedFilesArray_rightPart = new ArrayList<>();
-
+    
     final String fontChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890\"!`?'.,;:()[]{}<>|/@\\^$€-%+=#_&~*ёйцукенгшщзхъэждлорпавыфячсмитьбюЁЙЦУКЕНГШЩЗХЪЭЖДЛОРПАВЫФЯЧСМИТЬБЮ";
-
+    
     JsonValue modeNamesMap;
-
+    
     GDXDialogs dialogs;
-
+    
     @Override
     @SuppressWarnings("unchecked")
     public void create() {
-
+        
         MemoryUtils.setDisplayFactor(400);
-
+        
         completionSoundEffect = Gdx.audio.newSound(Gdx.files.internal("completed.ogg"));
-
+        
         memPerSecSmoothing = new float[memPerSecSmoothingFrame * 60];
-
+        
         dialogs = GDXDialogsSystem.install();
-
+        
         modeNamesMap = new JsonReader().parse(Gdx.files.internal("modesMap.json"));
-
+        
         batch = new SpriteBatch();
         renderer = new ShapeRenderer();
         renderer.setAutoShapeType(true);
-
+        
         camera = new OrthographicCamera(800, 480);
         viewport = new ScreenViewport(camera);
-
+        
         FreeTypeFontGenerator generator = new FreeTypeFontGenerator(Gdx.files.internal("font.ttf"));
         FreeTypeFontGenerator.FreeTypeFontParameter parameter = new FreeTypeFontGenerator.FreeTypeFontParameter();
         parameter.size = 12;
@@ -221,19 +222,19 @@ public class Main extends ApplicationAdapter {
         font = generator.generateFont(parameter);
         generator.dispose();
         font.getData().markupEnabled = true;
-
+        
         uiAtlas_buttons = new TextureAtlas(Gdx.files.internal("workshop.atlas"));
         uiAtlas = new TextureAtlas(Gdx.files.internal("ui.atlas"));
         uiTextures = new Skin();
         uiTextures.addRegions(uiAtlas);
         uiTextures.addRegions(uiAtlas_buttons);
-
+        
         checkBoxStyle = new CheckBox.CheckBoxStyle();
         checkBoxStyle.checkboxOff = uiTextures.getDrawable("checkBox_disabled");
         checkBoxStyle.checkboxOn = uiTextures.getDrawable("checkBox_enabled");
         checkBoxStyle.checkboxOver = uiTextures.getDrawable("checkBox_disabled_over");
         checkBoxStyle.checkboxOnOver = uiTextures.getDrawable("checkBox_enabled_over");
-
+        
         checkBoxStyle.checkboxOff.setMinHeight(30);
         checkBoxStyle.checkboxOff.setMinWidth(30);
         checkBoxStyle.checkboxOver.setMinHeight(30);
@@ -242,27 +243,27 @@ public class Main extends ApplicationAdapter {
         checkBoxStyle.checkboxOn.setMinWidth(30);
         checkBoxStyle.checkboxOnOver.setMinHeight(30);
         checkBoxStyle.checkboxOnOver.setMinWidth(30);
-
+        
         checkBoxStyle.font = font;
         checkBoxStyle.fontColor = Color.WHITE;
-
+        
         buttonStyle = new TextButton.TextButtonStyle();
         buttonStyle.up = uiTextures.getDrawable("blank_shopButton_disabled");
         buttonStyle.down = uiTextures.getDrawable("blank_shopButton_enabled");
         buttonStyle.over = uiTextures.getDrawable("blank_shopButton_over");
         buttonStyle.font = font;
         buttonStyle.fontColor = Color.WHITE;
-
+        
         labelStyle = new Label.LabelStyle();
         labelStyle.font = font;
         labelStyle.fontColor = Color.WHITE;
         labelStyle.background = constructFilledImageWithColor(10, 10, Color.DARK_GRAY);
-
+        
         stage = new Stage(viewport, batch);
         stage_results = new Stage(viewport, batch);
-
+        
         loadParams();
-
+        
         startScan = makeTextButton("Start Scanning", 110, 10, 150);
         changeMode = makeTextButton("Change mode", 110, 10, 405);
         commit = makeTextButton("Commit now", 110, 10, 450);
@@ -273,7 +274,7 @@ public class Main extends ApplicationAdapter {
         setClonePath = makeTextButton("Set clone folder path", 170, 615, 330);
         removeAllExtensions = makeTextButton("Remove all extensions", 170, 415, 420);
         addExtension = makeTextButton("Add an extension to scan", 170, 415, 450);
-
+        
         nextGroup = makeTextButton("Next Group", 110, 680, 450, false);
         prevGroup = makeTextButton("Previous Group", 110, 10, 450, false);
         deleteLeft = makeTextButton("Delete Group", 110, 10, 5, false);
@@ -282,40 +283,40 @@ public class Main extends ApplicationAdapter {
         deleteLeft.setColor(Color.RED);
         deleteRight.setColor(Color.RED);
         switchGroupMode.setColor(Color.SKY);
-
+        
         final CheckBox extensionFilterCheckBox = new CheckBox("Extension filter", checkBoxStyle);
         extensionFilterCheckBox.setPosition(415, 380);
         extensionFilterCheckBox.setChecked(extensionFilterEnabled);
         stage.addActor(extensionFilterCheckBox);
-
+        
         prevGroup.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
                 reloadSelectedGroup(-1);
             }
         });
-
+        
         nextGroup.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
                 reloadSelectedGroup(1);
             }
         });
-
+        
         deleteLeft.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
                 callGroupDeletionDialogue(false);
             }
         });
-
+        
         deleteRight.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
                 callGroupDeletionDialogue(true);
             }
         });
-
+        
         switchGroupMode.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -327,7 +328,7 @@ public class Main extends ApplicationAdapter {
                 currentlyLoadingPreviews = true;
             }
         });
-
+        
         changeMode.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -355,14 +356,14 @@ public class Main extends ApplicationAdapter {
                 saveParams();
             }
         });
-
+        
         commit.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
                 commitChanges();
             }
         });
-
+        
         extensionFilterCheckBox.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -371,7 +372,7 @@ public class Main extends ApplicationAdapter {
                 reloadExtensionsString();
             }
         });
-
+        
         startScan.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -379,7 +380,7 @@ public class Main extends ApplicationAdapter {
                 changeUiTouchableState(Touchable.disabled);
             }
         });
-
+        
         addExtension.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -398,7 +399,7 @@ public class Main extends ApplicationAdapter {
                 Gdx.input.getTextInput(listener, "Add an extension", ".", "");
             }
         });
-
+        
         addFolder.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -426,7 +427,7 @@ public class Main extends ApplicationAdapter {
                         });
             }
         });
-
+        
         removeAllFolders.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -437,7 +438,7 @@ public class Main extends ApplicationAdapter {
                 reloadFoldersString();
             }
         });
-
+        
         removeAllExtensions.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -447,7 +448,7 @@ public class Main extends ApplicationAdapter {
                 reloadExtensionsString();
             }
         });
-
+        
         setMasterPath.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -461,7 +462,7 @@ public class Main extends ApplicationAdapter {
                 }, false);
             }
         });
-
+        
         addSlavePath.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -477,7 +478,7 @@ public class Main extends ApplicationAdapter {
                 }, true);
             }
         });
-
+        
         setClonePath.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -491,7 +492,7 @@ public class Main extends ApplicationAdapter {
                 }, false);
             }
         });
-
+        
         if (Gdx.files.external(saveDirectory + "dupesSize").file().exists()) {
             callDialogue("Previous results available", "Load?",
                     "Yes", "No", null, new GeneralDialogueAction() {
@@ -519,16 +520,16 @@ public class Main extends ApplicationAdapter {
                         }
                     });
         }
-
+        
         readHashBase();
-
+        
         reloadFoldersString();
         reloadExtensionsString();
         updateModeDescription();
-
+        
         Gdx.input.setInputProcessor(stage);
     }
-
+    
     static void changeUiTouchableState(Touchable touchable) {
         if (touchable.equals(Touchable.disabled)) {
             startScan.setColor(Color.GRAY);
@@ -561,19 +562,19 @@ public class Main extends ApplicationAdapter {
         removeAllExtensions.setTouchable(touchable);
         addExtension.setTouchable(touchable);
     }
-
+    
     void callDialogue(String title, String message, String button1, String button2, String button3, final GeneralDialogueAction onClickAction) {
         GDXButtonDialog bDialog = dialogs.newDialog(GDXButtonDialog.class);
         bDialog.setTitle(title);
         bDialog.setMessage(message);
-
+        
         bDialog.setClickListener(new ButtonClickListener() {
             @Override
             public void click(int button) {
                 onClickAction.performAction(button);
             }
         });
-
+        
         if (!(button1 == null)) {
             bDialog.addButton(button1);
         }
@@ -583,10 +584,10 @@ public class Main extends ApplicationAdapter {
         if (!(button3 == null)) {
             bDialog.addButton(button3);
         }
-
+        
         bDialog.build().show();
     }
-
+    
     void callGroupDeletionDialogue(final boolean right) {
         if (right) {
             callDialogue("Delete right group?",
@@ -618,11 +619,11 @@ public class Main extends ApplicationAdapter {
                     });
         }
     }
-
+    
     void updateModeDescription() {
         comparisonMode_humanReadable = modeNamesMap.getString(mode.toString());
     }
-
+    
     void deleteFilesFromGroup(ArrayList<ArrayList<String>> group, boolean safeDelete) {
         ArrayList<String> filesToDelete = group.get(currentlySelectedGroup);
         ArrayList<Integer> indexMap = sortedFilesIndexMap.get(currentlySelectedGroup);
@@ -631,7 +632,7 @@ public class Main extends ApplicationAdapter {
         }
         saveDupeCountAndRefreshPreviews();
     }
-
+    
     void saveDupeCountAndRefreshPreviews(boolean refresh) {
         if (refresh) {
             currentlyLoadingPreviews = true;
@@ -643,11 +644,11 @@ public class Main extends ApplicationAdapter {
             }
         }
     }
-
+    
     void saveDupeCountAndRefreshPreviews() {
         saveDupeCountAndRefreshPreviews(true);
     }
-
+    
     void deleteFileAndDecrementDupes(String path, boolean safeDelete, int index) {
         if (dupesLeft.get(index) > 0) {
             File fileToDelete = new File(path);
@@ -667,7 +668,7 @@ public class Main extends ApplicationAdapter {
             }
         }
     }
-
+    
     void reloadSelectedGroup(int increment) {
         if (currentGroupMode == 0) {
             float prevGroup = currentlySelectedGroup;
@@ -681,7 +682,7 @@ public class Main extends ApplicationAdapter {
                             + "\nFiles in group: " + sortedFilesArray_leftPart.get(currentlySelectedGroup).size() * 2;
             currentlyLoadingPreviews = !(prevGroup == currentlySelectedGroup);
             resultsAvailable = prevGroup == currentlySelectedGroup;
-
+            
         } else {
             float prevGroup = currentlySelectedGroup_fingerprint;
             currentlySelectedGroup_fingerprint = MathUtils.clamp(currentlySelectedGroup_fingerprint + increment, 0, sortedFilesArray_fingerprintMatch.size() - 1);
@@ -692,7 +693,7 @@ public class Main extends ApplicationAdapter {
             resultsAvailable = prevGroup == currentlySelectedGroup_fingerprint;
         }
     }
-
+    
     TextButton makeTextButton(String text, float width, float x, float y, boolean addToStage) {
         TextButton button = new TextButton(text, buttonStyle);
         button.setWidth(width);
@@ -702,17 +703,17 @@ public class Main extends ApplicationAdapter {
         }
         return button;
     }
-
+    
     Label makeLabel(String text) {
         Label label = new Label(text, labelStyle);
         label.setWrap(true);
         return label;
     }
-
+    
     TextButton makeTextButton(String text, float width, float x, float y) {
         return makeTextButton(text, width, x, y, true);
     }
-
+    
     void commitChanges() {
         String fileName = saveDirectory + "results_" + mode + getCurrentDate() + "\\commit" + getCurrentTime() + "." + commitCount + ".txt";
         if (mode.equals(HASH_COMPARE) || mode.equals(NAME_COMPARE)) {
@@ -726,7 +727,7 @@ public class Main extends ApplicationAdapter {
         commitCount++;
         lastCommitTime = System.currentTimeMillis();
     }
-
+    
     void loadParams() {
         String[] allParams = new String[]{};
         foldersToSearch = new ArrayList<>();
@@ -734,13 +735,13 @@ public class Main extends ApplicationAdapter {
         foldersNotToSearch = new ArrayList<>();
         extensionsNotToSearch = new ArrayList<>();
         slaveFolders = new ArrayList<>();
-
+        
         if (!paramsFile.exists()) {
             paramsFile.writeString("c_mode_search", false);
         } else {
             allParams = paramsFile.readString().split("\r\n");
         }
-
+        
         for (String param : allParams) {
             if (param.startsWith("c_mode_")) {
                 mode = Mode.valueOf(param.substring(7));
@@ -771,13 +772,13 @@ public class Main extends ApplicationAdapter {
             }
         }
     }
-
+    
     void appendParams(String paramId, StringBuilder appendTo, ArrayList<String> params) {
         for (String parameter : params) {
             appendTo.append(paramId).append(parameter).append("\r\n");
         }
     }
-
+    
     void saveParams() {
         StringBuilder paramsToWrite = new StringBuilder();
         paramsToWrite.append("c_mode_").append(mode).append("\r\n");
@@ -793,7 +794,7 @@ public class Main extends ApplicationAdapter {
         }
         paramsFile.writeString(paramsToWrite.toString(), false);
     }
-
+    
     void reloadFoldersString() {
         StringBuilder builder = new StringBuilder();
         builder.append("[#00FF00]Folders to search: (").append(foldersToSearch.size()).append(")\n");
@@ -806,7 +807,7 @@ public class Main extends ApplicationAdapter {
         builder.append("[#FFDD00]Clone folder:").append(clonePath);
         foldersToSearch_string = builder.toString();
     }
-
+    
     void reloadExtensionsString() {
         StringBuilder builder = new StringBuilder();
         builder.append("[#00FF00]Extensions to search: (").append(extensionsToSearch.size()).append(")\n");
@@ -820,7 +821,7 @@ public class Main extends ApplicationAdapter {
         appendParams("", builder, extensionsNotToSearch);
         extensionsToSearch_string = builder.toString();
     }
-
+    
     String calculateFileGroupFingerprint(int index) {
         StringBuilder currentFingerprint = new StringBuilder(getFilePathWithoutName(dupes_first_part.get(index)));
         String[] secondPart = dupes_second_part.get(index).split("\n");
@@ -829,7 +830,7 @@ public class Main extends ApplicationAdapter {
         }
         return currentFingerprint.toString();
     }
-
+    
     void startScan() {
         allFiles = 0;
         comparedFiles = 0;
@@ -843,7 +844,7 @@ public class Main extends ApplicationAdapter {
                         ArrayList<File> files_master = getAllFiles(masterPath);
                         allFilesCalculated = files_master.size();
                         allMemoryCalculated = getDirectorySize(masterPath) + getDirectoriesSizeFromPaths(slaveFolders);
-
+                        
                         for (File master_file : files_master) {
                             if (filterExtension(master_file)) {
                                 String hash = getFileChecksum(master_file);
@@ -853,7 +854,7 @@ public class Main extends ApplicationAdapter {
                             }
                             addTotalNumberOfFiles(master_file);
                         }
-
+                        
                         for (String slavePath : slaveFolders) {
                             ArrayList<File> files_slave = getAllFiles(slavePath);
                             allFilesCalculated += files_slave.size();
@@ -896,16 +897,16 @@ public class Main extends ApplicationAdapter {
                         }
                         new Thread(new Runnable() {
                             public void run() {
-
+                                
                                 currentlySortingFolders = true;
                                 currentHash = "Sorting folders";
-
+                                
                                 int doneCounter = 0;
                                 int nextStartFrom = 0;
                                 boolean previousDone;
                                 String currentPath_left = "";
                                 String currentPath_right = "";
-
+                                
                                 while (doneCounter < notSortedFilesArray_leftPart.size()) {
                                     for (int i = nextStartFrom; i < notSortedFilesArray_leftPart.size(); i++) {
                                         if (!notSortedFilesArray_leftPart.get(i).equals("DONE")) {
@@ -919,7 +920,7 @@ public class Main extends ApplicationAdapter {
                                     ArrayList<String> rightPart = new ArrayList<>();
                                     ArrayList<Integer> indexMap_sorted = new ArrayList<>();
                                     previousDone = true;
-
+                                    
                                     for (int i = nextStartFrom; i < notSortedFilesArray_leftPart.size(); i++) {
                                         if (!notSortedFilesArray_leftPart.get(i).equals("DONE")) {
                                             if (getFilePathWithoutName(notSortedFilesArray_leftPart.get(i)).equals(currentPath_left) &&
@@ -942,7 +943,7 @@ public class Main extends ApplicationAdapter {
                                     sortedFilesIndexMap.add(indexMap_sorted);
                                     currentHash = "Sorting folders" + " (" + doneCounter + " / " + notSortedFilesArray_leftPart.size() + ", " + nextStartFrom + ")";
                                 }
-
+                                
                                 int completed = 0;
                                 nextStartFrom = 0;
                                 boolean[] doneFlags = new boolean[dupes_first_part.size()];
@@ -954,10 +955,10 @@ public class Main extends ApplicationAdapter {
                                             break;
                                         }
                                     }
-
+                                    
                                     ArrayList<Integer> group = new ArrayList<>();
                                     previousDone = true;
-
+                                    
                                     for (int i = nextStartFrom; i < dupes_first_part.size(); i++) {
                                         if (!doneFlags[i]) {
                                             if (currentFingerprint.equals(calculateFileGroupFingerprint(i))) {
@@ -973,7 +974,7 @@ public class Main extends ApplicationAdapter {
                                     }
                                     sortedFilesArray_fingerprintMatch.add(group);
                                 }
-
+                                
                                 currentlySortingFolders = false;
                                 currentlyPreLoadingPreviews = true;
                                 currentHash = "Preloading previews";
@@ -981,7 +982,7 @@ public class Main extends ApplicationAdapter {
                                     currentlyPreLoadingPreviews = false;
                                     currentHash = "No dupes found";
                                 }
-
+                                
                                 if (sortedFilesArray_leftPart.size() > 0) {
                                     new Thread(new Runnable() {
                                         public void run() {
@@ -1011,15 +1012,15 @@ public class Main extends ApplicationAdapter {
                         }).start();
                         break;
                     case EXIF_SORT: {
-
+                        
                         ArrayList<File> files = new ArrayList<>();
                         for (int i = 0; i < foldersToSearch.size(); i++) {
                             files.addAll(getAllFiles(foldersToSearch.get(i)));
                         }
-
+                        
                         allFilesCalculated = files.size();
                         allMemoryCalculated = getDirectoriesSizeFromPaths(foldersToSearch);
-
+                        
                         for (int i = 0; i < files.size(); i++) {
                             String fileName = files.get(i).getName().toLowerCase().trim();
                             if (canExtractExifData(fileName) && filterExtension(files.get(i))) {
@@ -1054,7 +1055,7 @@ public class Main extends ApplicationAdapter {
                         break;
                     }
                     case SHOW_STATS: {
-
+                        
                         ArrayList<String> extensions_sorted_size = new ArrayList<>();
                         ArrayList<String> extensions_sorted_quantity = new ArrayList<>();
                         ArrayList<String> cameraModels_sorted = new ArrayList<>();
@@ -1064,7 +1065,7 @@ public class Main extends ApplicationAdapter {
                         HashMap<String, Long> extensions_size = new HashMap<>();
                         HashMap<String, Integer> cameraModels = new HashMap<>();
                         HashMap<String, String> emptyFolders = new HashMap<>();
-
+                        
                         ArrayList<File> filesAndFolders = new ArrayList<>();
                         for (int i = 0; i < foldersToSearch.size(); i++) {
                             filesAndFolders.addAll(getAllFiles(foldersToSearch.get(i)));
@@ -1120,16 +1121,16 @@ public class Main extends ApplicationAdapter {
                             addTotalNumberOfFiles(file);
                         }
                         StringBuilder results = new StringBuilder();
-                        results.append("Detected camera models:").append(cameraModels.size()).append("\n");
-                        results.append("Detected extensions:").append(extensions_quantity.size()).append("\n");
-                        results.append("All empty folders:").append(emptyFolders.size()).append("\n");
-                        results.append("All files scanned:").append(allFilesCalculated).append("\n");
-                        results.append("Total size:").append(formatNumber(convertToGigabytes(allFileSizes))).append("Gb\n\n");
-                        results.append("File extension stats:\n");
-
+                        results.append("Detected camera models: ").append(cameraModels.size()).append("\n");
+                        results.append("Detected extensions: ").append(extensions_quantity.size()).append("\n");
+                        results.append("All empty folders: ").append(emptyFolders.size()).append("\n");
+                        results.append("All files scanned: ").append(allFilesCalculated).append("\n");
+                        results.append("Total size: ").append(formatNumber(convertToGigabytes(allFileSizes))).append("Gb\n\n");
+                        results.append("File extension stats: \n");
+                        
                         ArrayList<String> cameraModels_keySet = new ArrayList<>(cameraModels.keySet());
                         ArrayList<String> extension_keySet = new ArrayList<>(extensions_quantity.keySet());
-
+                        
                         ArrayList<String> indexes_extensions_quantity = new ArrayList<>();
                         ArrayList<String> indexes_extensions_size = new ArrayList<>();
                         ArrayList<String> indexes_cameraModels = new ArrayList<>();
@@ -1142,51 +1143,42 @@ public class Main extends ApplicationAdapter {
                         for (int i = 0; i < extension_keySet.size(); i++) {
                             indexes_extensions_size.add(extensions_size.get(extension_keySet.get(i)) + "." + i);
                         }
-
+                        
                         Collections.sort(indexes_extensions_quantity, new CustomIndexComparator());
                         Collections.sort(indexes_extensions_size, new CustomIndexComparator());
                         Collections.sort(indexes_cameraModels, new CustomIndexComparator());
-
+                        
                         for (String index : indexes_extensions_quantity) {
                             int actualIndex = Integer.parseInt(String.valueOf(index).split("\\.")[1]);
                             extensions_sorted_quantity.add(extension_keySet.get(actualIndex));
                         }
-
+                        
                         for (String index : indexes_extensions_size) {
                             int actualIndex = Integer.parseInt(String.valueOf(index).split("\\.")[1]);
                             extensions_sorted_size.add(extension_keySet.get(actualIndex));
                         }
-
+                        
                         for (String index : indexes_cameraModels) {
                             int actualIndex = Integer.parseInt(String.valueOf(index).split("\\.")[1]);
                             cameraModels_sorted.add(cameraModels_keySet.get(actualIndex));
                         }
-
+                        
                         int longestExtension = 0;
                         int longestQuantity = 0;
                         int longestSize = 0;
-
+                        
                         for (int i = 0; i < extension_keySet.size(); i++) {
-                            int currentExtension = extension_keySet.get(i).length();
-                            int currentQuantity = String.valueOf(extensions_quantity.get(extension_keySet.get(i))).length();
-                            int currentSize = (formatNumber(convertToGigabytes(extensions_size.get(extension_keySet.get(i)))) + "Gb").length();
-                            if (currentExtension > longestExtension) {
-                                longestExtension = currentExtension;
-                            }
-                            if (currentSize > longestSize) {
-                                longestSize = currentSize;
-                            }
-                            if (currentQuantity > longestQuantity) {
-                                longestQuantity = currentQuantity;
-                            }
+                            longestExtension = max(extension_keySet.get(i).length(), longestExtension);
+                            longestSize = max((formatNumber(convertToGigabytes(extensions_size.get(extension_keySet.get(i)))) + "Gb").length(), longestSize);
+                            longestQuantity = max(String.valueOf(extensions_quantity.get(extension_keySet.get(i))).length(), longestQuantity);
                         }
-
+                        
                         ArrayList<String> extensions_sorted_results = new ArrayList<>();
                         for (int i = 0; i < extensions_sorted_quantity.size(); i++) {
-
+                            
                             String ext_sort1 = extensions_sorted_quantity.get(i);
                             String ext_sort2 = extensions_sorted_size.get(i);
-
+                            
                             StringBuilder itemToAdd = new StringBuilder();
                             for (int i2 = 0; i2 < 2; i2++) {
                                 String ext;
@@ -1206,14 +1198,21 @@ public class Main extends ApplicationAdapter {
                             }
                             extensions_sorted_results.add(itemToAdd.toString());
                         }
-
+                        
                         for (String item : extensions_sorted_results) {
                             results.append(item);
                         }
-
+                        
+                        int longestCameraName = 0;
+                        int longestCameraCount = 0;
+                        for (String model : cameraModels_sorted) {
+                            longestCameraName = max(longestCameraName, model.length());
+                            longestCameraCount = max(longestCameraCount, (cameraModels.get(model) + "").length());
+                        }
+                        
                         results.append("\nCamera model stats:\n");
                         for (String model : cameraModels_sorted) {
-                            results.append(normaliseLength(model, 15)).append(" ").append(cameraModels.get(model)).append(" ");
+                            results.append(normaliseLength(model, longestCameraName)).append(" ").append(normaliseLength(cameraModels.get(model) + "", longestCameraCount)).append(" ");
                             if (formatNumber(cameraModels.get(model) / (double) allCameraModels * 100) == 0) {
                                 results.append("<.01%\n");
                             } else {
@@ -1241,23 +1240,23 @@ public class Main extends ApplicationAdapter {
             }
         }).start();
     }
-
+    
     void addTotalNumberOfFiles(File file) {
         allFiles++;
         allMemory += file.length();
     }
-
+    
     void commitDupe(File file) {
         duplicatesOriginal++;
         dupesSize += convertToGigabytes(file.length());
     }
-
+    
     void commitDupe(long fileSize, String commitMessage) {
         dupes_merged.add(commitMessage);
         duplicatesOriginal++;
         dupesSize += convertToGigabytes(fileSize);
     }
-
+    
     static boolean filterFolder(File folder) {
         for (String blacklistedFolder : foldersNotToSearch) {
             if (folder.getAbsoluteFile().toString().toLowerCase().endsWith(blacklistedFolder.toLowerCase())) {
@@ -1267,7 +1266,7 @@ public class Main extends ApplicationAdapter {
         }
         return true;
     }
-
+    
     boolean filterExtension(File file) {
         boolean addToList = !extensionFilterEnabled;
         if (extensionFilterEnabled) {
@@ -1296,13 +1295,13 @@ public class Main extends ApplicationAdapter {
         }
         return addToList;
     }
-
+    
     public void walk(String path) {
         File root = new File(path);
         File[] list = root.listFiles();
-
+        
         if (list == null || !filterFolder(root)) return;
-
+        
         for (final File file : list) {
             if (file.isDirectory()) {
                 walk(file.getAbsolutePath());
@@ -1330,10 +1329,10 @@ public class Main extends ApplicationAdapter {
                             commitDupe(file);
                             String currentDupeFromList = hashedFiles.get(currentHash);
                             String currentDupeFromDisk = file.getAbsoluteFile().toString();
-
+                            
                             notSortedFilesArray_leftPart.add(currentDupeFromList);
                             notSortedFilesArray_rightPart.add(currentDupeFromDisk);
-
+                            
                             if (!dupes_first_part.contains(currentDupeFromList)) {
                                 dupes_first_part.add(currentDupeFromList);
                                 dupes_second_part.add(currentDupeFromDisk);
@@ -1355,7 +1354,7 @@ public class Main extends ApplicationAdapter {
             }
         }
     }
-
+    
     @Override
     public void resize(int width, int height) {
         viewport.update(width, height);
@@ -1366,7 +1365,7 @@ public class Main extends ApplicationAdapter {
         camera.zoom = 1 / zoom;
         camera.update();
     }
-
+    
     String addFileStateSymbol(String filePath) {
         if (new File(filePath).exists()) {
             return "⬛" + filePath;
@@ -1374,39 +1373,39 @@ public class Main extends ApplicationAdapter {
             return "☐" + filePath;
         }
     }
-
+    
     CheckBox loadPreviewEntry(final String path, Table addTo, final int indexInArray) {
-
+        
         CheckBox checkBox = null;
-
+        
         Table entryTable = new Table();
         final Image preview;
-
+        
         final File imageFile = new File(path);
-
+        
         preview = new Image(loadPreview(path));
-
+        
         preview.setScaling(Scaling.fit);
         entryTable.add(preview).size(250).row();
         TextButton name = makeTextButton(imageFile.getName() + ", \n"
                 + dupesLeft.get(indexInArray) + " dupes left, hash: " + fileHashes.get(indexInArray).substring(0, 10) + "..., size: " + formatNumber(convertToMegabytes(imageFile.length())) + "Mb", 150, 65, 0);
-
+        
         name.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-
+                
                 String[] secondPartPaths = dupes_second_part.get(indexInArray).split("\n");
                 for (int i = 0; i < secondPartPaths.length; i++) {
                     secondPartPaths[i] = addFileStateSymbol(secondPartPaths[i]);
                 }
-
+                
                 StringBuilder rightPaths = new StringBuilder();
                 for (String rightPath_modified : secondPartPaths) {
                     rightPaths.append(rightPath_modified).append("\n");
                 }
-
+                
                 String message = addFileStateSymbol(dupes_first_part.get(indexInArray)) + "\nand\n" + rightPaths;
-
+                
                 String message2 = dupesLeft.get(indexInArray) + " dupes left";
                 if (dupesLeft.get(indexInArray) == 0) {
                     message2 = "\n\n\nWARNING: " + message2 + ", think twice before deleting!!!";
@@ -1432,19 +1431,19 @@ public class Main extends ApplicationAdapter {
         addTo.add(entryTable).pad(7).padTop(27).align(Align.center).row();
         return checkBox;
     }
-
+    
     @Override
     public void render() {
         Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
-
+        
         if (playCompletionSound) {
             completionSoundEffect.play(1, 0.5f, 0);
             playCompletionSound = false;
         }
-
+        
         float memPerSec_current = (allMemory - prevMemory) / Gdx.graphics.getDeltaTime();
-
+        
         float memPerSec_raw = 0;
         for (int i = 0; i < memPerSecSmoothing.length; i++) {
             memPerSec_raw += memPerSecSmoothing[i];
@@ -1454,11 +1453,11 @@ public class Main extends ApplicationAdapter {
         }
         memPerSecSmoothing[memPerSecSmoothing.length - 1] = memPerSec_current;
         memPerSec_raw = memPerSec_raw / (float) memPerSecSmoothing.length;
-
+        
         float minutesLeft = (float) formatNumber((allMemoryCalculated - allMemory) / memPerSec_raw / 60f);
         float memPerSec = (float) formatNumber(convertToMegabytes((long) memPerSec_raw));
         prevMemory = allMemory;
-
+        
         if (currentlyPreLoadingPreviews) {
             ArrayList<String> loadFrom_left = sortedFilesArray_leftPart.get(preloadGroupIndex);
             ArrayList<String> loadFrom_right = sortedFilesArray_rightPart.get(preloadGroupIndex);
@@ -1475,7 +1474,7 @@ public class Main extends ApplicationAdapter {
                 playCompletionSound = true;
             }
         }
-
+        
         if (currentlyLoadingPreviews) {
             stage_results.clear();
             Table container = new Table();
@@ -1486,21 +1485,21 @@ public class Main extends ApplicationAdapter {
                 ArrayList<Integer> loadFromIndexMap = sortedFilesIndexMap.get(currentlySelectedGroup);
                 Table rightTable = new Table();
                 Table leftTable = new Table();
-
+                
                 unloadAllTextures();
                 for (int i = 0; i < loadFrom_left.size(); i++) {
                     loadPreviewEntry(loadFrom_left.get(i), leftTable, loadFromIndexMap.get(i));
                     loadPreviewEntry(loadFrom_right.get(i), rightTable, loadFromIndexMap.get(i));
                 }
-
+                
                 container.add(leftTable).width(400);
                 container.add(rightTable).width(400);
             } else {
-
+                
                 final ArrayList<Integer> loadFrom = sortedFilesArray_fingerprintMatch.get(currentlySelectedGroup_fingerprint);
                 final ArrayList<ArrayList<String>> dupesMerged = new ArrayList<>();
                 final ArrayList<ArrayList<Boolean>> dupesMerged_checked = new ArrayList<>();
-
+                
                 for (int i = 0; i < loadFrom.size(); i++) {
                     ArrayList<String> merged = new ArrayList<>();
                     ArrayList<Boolean> merged_checked = new ArrayList<>();
@@ -1512,7 +1511,7 @@ public class Main extends ApplicationAdapter {
                     dupesMerged_checked.add(merged_checked);
                     dupesMerged.add(merged);
                 }
-
+                
                 for (int i = 0; i < loadFrom.size(); i++) {
                     Table column = new Table();
                     ArrayList<String> loadGroupFrom = dupesMerged.get(i);
@@ -1537,7 +1536,7 @@ public class Main extends ApplicationAdapter {
                                                     }
                                                 }
                                             });
-
+                                    
                                 }
                             });
                             Table container_small = new Table();
@@ -1581,7 +1580,7 @@ public class Main extends ApplicationAdapter {
                     }
                 });
             }
-
+            
             ScrollPane.ScrollPaneStyle scrollStyle = new ScrollPane.ScrollPaneStyle();
             scrollStyle.vScroll = constructFilledImageWithColor(10, 50, Color.DARK_GRAY);
             scrollStyle.vScrollKnob = constructFilledImageWithColor(10, 50, Color.RED);
@@ -1611,13 +1610,13 @@ public class Main extends ApplicationAdapter {
             reloadSelectedGroup(0);
             Gdx.input.setInputProcessor(stage_results);
         }
-
+        
         batch.setProjectionMatrix(camera.combined);
         renderer.setProjectionMatrix(camera.combined);
-
+        
         renderer.begin();
         renderer.set(ShapeRenderer.ShapeType.Filled);
-
+        
         renderer.setColor(Color.GOLDENROD);
         renderer.rect(400, 0, getCachedMemInPixels(), 20);
         renderer.setColor(Color.valueOf("#007700"));
@@ -1631,7 +1630,7 @@ public class Main extends ApplicationAdapter {
         batch.begin();
         font.draw(batch, "[#FFFFFF]Memory usage: " + getUsedMemInGb() + "/" + getAvailableMemoryInGb() + "Gb, max: " + getMaxMemoryUsageInGb() + "Gb", 400, 16, 400, -1, false);
         batch.end();
-
+        
         if (currentlySortingFolders) {
             renderer.begin();
             float heightIncrement = 480 / (float) notSortedFilesArray_leftPart.size();
@@ -1645,9 +1644,9 @@ public class Main extends ApplicationAdapter {
             }
             renderer.end();
         }
-
+        
         batch.begin();
-
+        
         if (!resultsAvailable) {
             font.draw(batch, "[#00FF00]" + currentFile, 10, 68, 800, -1, false);
             font.draw(batch, "[#00FF00]" + currentHash, 10, 52, 800, -1, false);
@@ -1662,9 +1661,9 @@ public class Main extends ApplicationAdapter {
             font.draw(batch, "[#00FF00]Last commit: " + getElapsedTime(lastCommitTime) + " min ago(" + commitCount + " commits)", 10, 445, 400, -1, false);
             font.draw(batch, "[#FFFF00]Mode: [#55FF55]" + comparisonMode_humanReadable, 10, 400, 400, -1, true);
         }
-
+        
         batch.end();
-
+        
         if (!resultsAvailable) {
             stage.draw();
             stage.act();
@@ -1672,14 +1671,14 @@ public class Main extends ApplicationAdapter {
             stage_results.draw();
             stage_results.act();
         }
-
+        
         if (resultsAvailable) {
             batch.begin();
             font.draw(batch, currentlyViewedPaths, 75, 473, 650, 1, true);
             batch.end();
         }
     }
-
+    
     @Override
     public void dispose() {
         batch.dispose();
@@ -1697,7 +1696,7 @@ class CustomTextInputListener implements Input.TextInputListener {
     @Override
     public void input(String text) {
     }
-
+    
     @Override
     public void canceled() {
     }
@@ -1705,7 +1704,7 @@ class CustomTextInputListener implements Input.TextInputListener {
 
 class GeneralDialogueAction {
     void performAction(int button) {
-
+    
     }
 }
 
