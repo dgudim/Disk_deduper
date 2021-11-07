@@ -835,6 +835,9 @@ public class Main extends ApplicationAdapter {
         allFiles = 0;
         comparedFiles = 0;
         prevMemory = 0;
+        allFilesCalculated = 0;
+        allMemoryCalculated = 0;
+        allMemory = 0;
         new Thread(new Runnable() {
             public void run() {
                 startTime = System.currentTimeMillis();
@@ -1414,7 +1417,7 @@ public class Main extends ApplicationAdapter {
                         new GeneralDialogueAction() {
                             @Override
                             void performAction(int button) {
-                                if (!(button == 2)) {
+                                if (button != 2 && button != -1) {
                                     deleteFileAndDecrementDupes(path, button == 0, indexInArray);
                                     preview.setDrawable(new Image(loadPreview(path)).getDrawable());
                                     saveDupeCountAndRefreshPreviews(false);
