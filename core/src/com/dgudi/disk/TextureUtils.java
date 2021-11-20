@@ -31,7 +31,6 @@ public class TextureUtils {
     public static Texture loadPreview(String inputPath) {
         Texture toReturn;
         Pixmap outputPixmap = null;
-        boolean outputPixmapCreated = false;
         try {
             FileHandle file;
             boolean createThumbnail = false;
@@ -48,8 +47,7 @@ public class TextureUtils {
             }
 
             outputPixmap = createThumbnail(file, inputPath, false, createThumbnail);
-            outputPixmapCreated = createThumbnail;
-
+            
             if (inputPath.contains(deletedMessage)) {
                 outputPixmap.setColor(Color.RED);
                 int radius = (int) (min(outputPixmap.getWidth(), outputPixmap.getHeight()) / 5f);
@@ -60,12 +58,12 @@ public class TextureUtils {
 
             toReturn = new Texture(outputPixmap);
 
-            if (outputPixmapCreated) {
+            if (outputPixmap != null) {
                 outputPixmap.dispose();
             }
         } catch (Exception e) {
             Main.currentErrorMessage = "[#FF0000]Error loading preview: " + e.getMessage();
-            if (outputPixmapCreated) {
+            if (outputPixmap != null) {
                 outputPixmap.dispose();
             }
             toReturn = new Texture(Gdx.files.internal("error.png"));
