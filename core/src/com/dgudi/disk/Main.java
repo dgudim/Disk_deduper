@@ -737,7 +737,7 @@ public class Main extends ApplicationAdapter {
         slaveFolders = new ArrayList<>();
         
         if (!paramsFile.exists()) {
-            paramsFile.writeString("c_mode_search", false);
+            paramsFile.writeString("c_mode_NAME_COMPARE", false);
         } else {
             allParams = paramsFile.readString().split("\r\n");
         }

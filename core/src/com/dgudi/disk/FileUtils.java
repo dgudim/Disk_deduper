@@ -17,7 +17,7 @@ import static com.dgudi.disk.Main.filterFolder;
 
 public class FileUtils {
 
-    final static String saveDirectory = "DiskScanPreferences\\";
+    final static String saveDirectory = "DiskScanPreferences" + File.separator;
     final static FileHandle paramsFile = Gdx.files.external(saveDirectory + "params.txt");
     final static long moveThreadDelay = 50;
     final static int emptyDirectorySize = 5000;
@@ -107,8 +107,8 @@ public class FileUtils {
     }
 
     public static String moveAccordingToFolderStructure(File getFrom, String clonePath) {
-        String fullPath = clonePath + "\\" + (getFrom.getAbsolutePath().substring(3));
-        int lastDirectoryIndex = fullPath.lastIndexOf("\\");
+        String fullPath = clonePath + File.separator + (getFrom.getAbsolutePath().substring(3));
+        int lastDirectoryIndex = fullPath.lastIndexOf(File.separator);
         String path = fullPath.substring(0, lastDirectoryIndex);
         boolean success = true;
         if (!new File(path).exists()) {
@@ -140,7 +140,7 @@ public class FileUtils {
         String fullPath = fileToDelete.getAbsolutePath();
         String name = fileToDelete.getName();
         String pathWithoutName = getFilePathWithoutName(fullPath);
-        String newName = pathWithoutName + "\\" + deletedMessage + name;
+        String newName = pathWithoutName + File.separator + deletedMessage + name;
         boolean success = fileToDelete.renameTo(new File(newName));
         sleep();
         if (success) {
@@ -167,7 +167,7 @@ public class FileUtils {
     }
 
     static void callFileChooser(FileDialogueAction action, boolean multiSelect) {
-        JFileChooser jFileChooser = new JFileChooser(new File("C:\\"));
+        JFileChooser jFileChooser = new JFileChooser(new File(""));
         jFileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
         jFileChooser.setMultiSelectionEnabled(multiSelect);
 
